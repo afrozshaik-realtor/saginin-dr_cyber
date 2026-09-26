@@ -1,5 +1,5 @@
 {
-  "name": "cyber-career-pathway-funnel",
+  "name": "dr-cyber",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -19,6 +19,7 @@
     "next": "^14.2.18",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "stripe": "^22.6.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {

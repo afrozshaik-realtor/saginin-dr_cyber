@@ -57,7 +57,7 @@ export default async function ResultPage({ searchParams }: { searchParams: { id?
             <p className="mt-5 max-w-3xl text-lg text-slate-200">{pathway.why}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link className="focus-ring rounded-md bg-cyan px-5 py-3 font-bold text-navy hover:bg-mint" href="/book">
-                Book a free Cyber Career Roadmap Call
+                Book a free Dr Cyber Roadmap Call
               </Link>
               <a className="focus-ring rounded-md border border-white/20 px-5 py-3 font-bold" href={settings.masterclassLink}>
                 Join the free masterclass

@@ -25,8 +25,8 @@ async function main() {
     booking_link: process.env.BOOKING_LINK || "https://calendly.com/your-team/cyber-career-roadmap-call",
     admin_notification_email: process.env.ADMIN_NOTIFICATION_EMAIL || email,
     sms_enabled: process.env.SMS_ENABLED || "false",
-    default_sender_name: process.env.DEFAULT_SENDER_NAME || "Cyber Career Pathway Team",
-    program_cohort_name: process.env.PROGRAM_COHORT_NAME || "Cyber Career Switch Program"
+    default_sender_name: process.env.DEFAULT_SENDER_NAME || "Dr Cyber Team",
+    program_cohort_name: process.env.PROGRAM_COHORT_NAME || "Dr Cyber Switch Program"
   };
 
   for (const [settingKey, settingValue] of Object.entries(settings)) {

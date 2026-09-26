@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cyber Career Pathway Funnel",
+  metadataBase: new URL(process.env.APP_URL || "https://app.drcyber.ca"),
+  title: "Dr Cyber",
   description: "Discover the cybersecurity pathway that fits your background and career goals."
 };
 

@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import type { FunnelLead, MessageLog, PipelineRecord, QuizResponseRecord } from "@/types/funnel";
+import type { Enrollment, LessonProgressRecord, Student } from "@/types/lms";
 
 type EventRecord = {
   id: string;
@@ -20,6 +21,9 @@ type DataStore = {
   smsLogs: MessageLog[];
   events: EventRecord[];
   settings: Record<string, string>;
+  students: Student[];
+  enrollments: Enrollment[];
+  lessonProgress: LessonProgressRecord[];
 };
 
 const dataDir = path.join(process.cwd(), ".data");
@@ -32,7 +36,10 @@ const emptyStore = (): DataStore => ({
   emailLogs: [],
   smsLogs: [],
   events: [],
-  settings: {}
+  settings: {},
+  students: [],
+  enrollments: [],
+  lessonProgress: []
 });
 
 async function readStore(): Promise<DataStore> {
@@ -220,6 +227,129 @@ export async function getMetrics() {
     enrolled,
     conversionRate: quizCompletions ? Math.round((callsBooked / quizCompletions) * 100) : 0,
     leadsByPathway,
-    recentLeads: store.leads.slice(-8).reverse()
+    recentLeads: store.leads.slice(-8).reverse(),
+    totalStudents: store.students.length,
+    totalEnrollments: store.enrollments.length,
+    totalRevenueCents: store.enrollments
+      .filter((enrollment) => enrollment.paymentStatus === "paid")
+      .reduce((sum, enrollment) => sum + (enrollment.amountPaidCents || 0), 0)
   };
+}
+
+export async function createStudent(input: { name: string; email: string; passwordHash: string }) {
+  const store = await readStore();
+  const existing = store.students.find((student) => student.email.toLowerCase() === input.email.toLowerCase());
+  if (existing) return null;
+  const student: Student = {
+    id: randomUUID(),
+    name: input.name,
+    email: input.email,
+    passwordHash: input.passwordHash,
+    createdAt: new Date().toISOString()
+  };
+  store.students.push(student);
+  await writeStore(store);
+  return student;
+}
+
+export async function getStudentByEmail(email: string) {
+  const store = await readStore();
+  return store.students.find((student) => student.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+export async function getStudentById(id: string) {
+  const store = await readStore();
+  return store.students.find((student) => student.id === id) || null;
+}
+
+export async function enrollStudent(
+  studentId: string,
+  courseId: string,
+  payment: {
+    paymentStatus: Enrollment["paymentStatus"];
+    amountPaidCents?: number;
+    currency?: string;
+    stripeSessionId?: string;
+  }
+) {
+  const store = await readStore();
+  const existingIndex = store.enrollments.findIndex(
+    (enrollment) => enrollment.studentId === studentId && enrollment.courseId === courseId
+  );
+  const existing = store.enrollments[existingIndex];
+  const enrollment: Enrollment = {
+    id: existing?.id || randomUUID(),
+    studentId,
+    courseId,
+    enrolledAt: existing?.enrolledAt || new Date().toISOString(),
+    completedAt: existing?.completedAt,
+    paymentStatus: payment.paymentStatus,
+    amountPaidCents: payment.amountPaidCents ?? existing?.amountPaidCents,
+    currency: payment.currency ?? existing?.currency,
+    stripeSessionId: payment.stripeSessionId ?? existing?.stripeSessionId
+  };
+  if (existingIndex >= 0) store.enrollments[existingIndex] = enrollment;
+  else store.enrollments.push(enrollment);
+  await writeStore(store);
+  return enrollment;
+}
+
+export async function getEnrollment(studentId: string, courseId: string) {
+  const store = await readStore();
+  return (
+    store.enrollments.find((enrollment) => enrollment.studentId === studentId && enrollment.courseId === courseId) ||
+    null
+  );
+}
+
+export async function listEnrollmentsForStudent(studentId: string) {
+  const store = await readStore();
+  return store.enrollments
+    .filter((enrollment) => enrollment.studentId === studentId)
+    .sort((a, b) => b.enrolledAt.localeCompare(a.enrolledAt));
+}
+
+export async function setLessonProgress(
+  studentId: string,
+  courseId: string,
+  lessonId: string,
+  completed: boolean
+) {
+  const store = await readStore();
+  const existingIndex = store.lessonProgress.findIndex(
+    (record) => record.studentId === studentId && record.lessonId === lessonId
+  );
+  const record: LessonProgressRecord = {
+    id: store.lessonProgress[existingIndex]?.id || randomUUID(),
+    studentId,
+    courseId,
+    lessonId,
+    completed,
+    completedAt: completed ? new Date().toISOString() : undefined
+  };
+  if (existingIndex >= 0) store.lessonProgress[existingIndex] = record;
+  else store.lessonProgress.push(record);
+  await writeStore(store);
+  return record;
+}
+
+export async function getLessonProgressMap(studentId: string, courseId: string) {
+  const store = await readStore();
+  const map: Record<string, boolean> = {};
+  store.lessonProgress
+    .filter((record) => record.studentId === studentId && record.courseId === courseId)
+    .forEach((record) => {
+      map[record.lessonId] = record.completed;
+    });
+  return map;
+}
+
+export async function listStudentsWithStats() {
+  const store = await readStore();
+  return store.students
+    .map((student) => ({
+      ...student,
+      enrollments: store.enrollments.filter((enrollment) => enrollment.studentId === student.id)
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

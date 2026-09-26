@@ -4,7 +4,7 @@ import type { FunnelLead } from "@/types/funnel";
 
 export async function sendResultSms(lead: FunnelLead) {
   const settings = appSettings();
-  const message = `Hi ${lead.firstName}, your Cyber Career Pathway result is ready: ${lead.pathwayResult}. Book your free roadmap call here: ${settings.bookingLink}`;
+  const message = `Hi ${lead.firstName}, your Dr Cyber result is ready: ${lead.pathwayResult}. Book your free roadmap call here: ${settings.bookingLink}`;
 
   if (!settings.smsEnabled || !lead.phone) {
     await logSms(lead.id, "quiz-result", message, "skipped");

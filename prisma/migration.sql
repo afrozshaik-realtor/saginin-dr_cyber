@@ -80,3 +80,34 @@ CREATE TABLE IF NOT EXISTS automation_settings (
   setting_value TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS students (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS enrollments (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  course_id TEXT NOT NULL,
+  enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  payment_status TEXT NOT NULL DEFAULT 'unpaid',
+  amount_paid_cents INTEGER,
+  currency TEXT,
+  stripe_session_id TEXT UNIQUE,
+  UNIQUE (student_id, course_id)
+);
+
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  course_id TEXT NOT NULL,
+  lesson_id TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (student_id, lesson_id)
+);

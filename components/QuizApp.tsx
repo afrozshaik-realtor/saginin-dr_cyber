@@ -106,7 +106,7 @@ export function QuizApp({ questions, searchParams }: Props) {
               }
             />
             <div className="p-5">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Cyber Career Pathway Quiz</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-mint">Dr Cyber Quiz</p>
               <p className="mt-2 text-sm text-slate-300">
                 Ten answers create a pathway score, skill match, and recommended roadmap.
               </p>

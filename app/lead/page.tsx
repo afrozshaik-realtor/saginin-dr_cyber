@@ -10,7 +10,7 @@ export default function LeadCapturePage() {
           The lead form is built into the quiz so your contact record includes pathway scores and answer history.
         </p>
         <Link className="mt-8 inline-flex rounded-md bg-cyan px-5 py-3 font-bold text-navy hover:bg-mint" href="/quiz">
-          Take the Free Cyber Career Quiz
+          Take the Free Dr Cyber Quiz
         </Link>
       </section>
     </main>
