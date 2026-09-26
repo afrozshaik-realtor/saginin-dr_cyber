@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { getStudentById } from "@/lib/store";
 
-const cookieName = "ccpf_student";
+const cookieName = "drcyber_student";
 
 function secret() {
   return process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || "dev-secret-change-me";

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 
-const cookieName = "ccpf_admin";
+const cookieName = "drcyber_admin";
 
 export async function verifyAdmin(email: string, password: string) {
   const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
