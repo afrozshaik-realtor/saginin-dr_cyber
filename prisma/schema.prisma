@@ -111,3 +111,40 @@ model AutomationSetting {
 
   @@map("automation_settings")
 }
+
+model Student {
+  id             String           @id @default(cuid())
+  name           String
+  email          String           @unique
+  passwordHash   String           @map("password_hash")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  enrollments    Enrollment[]
+  lessonProgress LessonProgress[]
+
+  @@map("students")
+}
+
+model Enrollment {
+  id          String    @id @default(cuid())
+  studentId   String    @map("student_id")
+  courseId    String    @map("course_id")
+  enrolledAt  DateTime  @default(now()) @map("enrolled_at")
+  completedAt DateTime? @map("completed_at")
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id          String    @id @default(cuid())
+  studentId   String    @map("student_id")
+  courseId    String    @map("course_id")
+  lessonId    String    @map("lesson_id")
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@map("lesson_progress")
+}

@@ -59,6 +59,9 @@ export default function LandingPage({
               <ButtonLink href="#pathways" variant="secondary">
                 Explore pathways
               </ButtonLink>
+              <ButtonLink href="/courses" variant="secondary">
+                Browse courses
+              </ButtonLink>
             </div>
           </div>
           <div className="overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-glow">

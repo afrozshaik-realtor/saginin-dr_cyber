@@ -1,6 +1,17 @@
 # Cyber Career Pathway Funnel
 
-Marketing automation MVP for a cybersecurity career-switch funnel. It includes a landing page, 10-question pathway quiz, lead capture, personalized result page, email/SMS-ready automation, CRM-style admin dashboard, webhook endpoints, and PostgreSQL/Supabase schema.
+Marketing automation MVP for a cybersecurity career-switch funnel. It includes a landing page, 10-question pathway quiz, lead capture, personalized result page, email/SMS-ready automation, CRM-style admin dashboard, webhook endpoints, PostgreSQL/Supabase schema, and a built-in LMS for hosting the online courses.
+
+## LMS (Online Courses)
+
+- `/courses` - public course catalog. Each of the 8 career pathways is available as a self-paced course with modules, lessons, and portfolio projects.
+- `/courses/[slug]` - course landing page with the full curriculum outline and an "Enroll for free" call to action.
+- `/signup` and `/login` - student accounts, separate from the admin login, stored with a bcrypt password hash and a signed session cookie.
+- `/dashboard` - a logged-in student's enrolled courses with a progress bar per course.
+- `/learn/[slug]` - the lesson player: a sidebar with every module/lesson, lesson content, and a "Mark lesson complete" action that updates progress instantly.
+- `/admin/students` - admin view of every student and which courses they're enrolled in.
+
+Course/module/lesson content is defined in code at `lib/config/courses.ts` (derived from the pathway roadmaps in `lib/config/pathways.ts`), while students, enrollments, and lesson progress are stored as data (JSON store locally, or the `students` / `enrollments` / `lesson_progress` tables in Postgres). Enrollment is free in this MVP; wire in Stripe or another billing provider before charging for a course.
 
 ## Run Locally
 

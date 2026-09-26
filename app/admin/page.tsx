@@ -11,7 +11,9 @@ export default async function AdminDashboard() {
     ["Quiz completions", metrics.quizCompletions],
     ["Calls booked", metrics.callsBooked],
     ["Enrolled students", metrics.enrolled],
-    ["Quiz to call conversion", `${metrics.conversionRate}%`]
+    ["Quiz to call conversion", `${metrics.conversionRate}%`],
+    ["LMS students", metrics.totalStudents],
+    ["Course enrollments", metrics.totalEnrollments]
   ];
 
   return (
