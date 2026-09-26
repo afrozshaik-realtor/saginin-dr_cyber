@@ -6,7 +6,7 @@ export function AdminNav() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link className="flex items-center gap-2 font-bold" href="/admin">
           <img className="h-8 w-8 rounded-full" src="/images/logo.jpg" alt="" aria-hidden="true" />
-          Cyber Pathway Admin
+          Dr Cyber Admin
         </Link>
         <div className="flex gap-4 text-sm font-semibold text-slate-600">
           <Link href="/admin/leads">Leads</Link>

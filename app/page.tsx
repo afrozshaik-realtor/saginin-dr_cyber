@@ -55,7 +55,7 @@ export default function LandingPage({
               career roadmap quiz and get a personalized learning plan.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <ButtonLink href={quizHref}>Take the Free Cyber Career Quiz</ButtonLink>
+              <ButtonLink href={quizHref}>Take the Free Dr Cyber Quiz</ButtonLink>
               <ButtonLink href="#pathways" variant="secondary">
                 Explore pathways
               </ButtonLink>
@@ -217,7 +217,7 @@ export default function LandingPage({
             <h2 className="text-3xl font-bold">Find your cyber pathway today</h2>
             <p className="mt-2 text-slate-600">The quiz takes about five minutes and creates your personalized roadmap.</p>
           </div>
-          <ButtonLink href={quizHref}>Take the Free Cyber Career Quiz</ButtonLink>
+          <ButtonLink href={quizHref}>Take the Free Dr Cyber Quiz</ButtonLink>
         </div>
       </section>
     </main>

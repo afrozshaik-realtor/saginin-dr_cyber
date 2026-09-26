@@ -4,7 +4,7 @@ import { courses } from "@/lib/config/courses";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
 export const metadata = {
-  title: "Courses | Cyber Career Pathway"
+  title: "Courses | Dr Cyber"
 };
 
 export default async function CoursesPage() {

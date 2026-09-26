@@ -8,7 +8,7 @@ import { getCurrentStudent } from "@/lib/studentAuth";
 
 export function generateMetadata({ params }: { params: { slug: string } }) {
   const course = getCourseBySlug(params.slug);
-  return { title: course ? `${course.title} | Cyber Career Pathway` : "Course not found" };
+  return { title: course ? `${course.title} | Dr Cyber` : "Course not found" };
 }
 
 const checkoutMessages: Record<string, string> = {

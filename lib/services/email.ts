@@ -50,14 +50,14 @@ Your suggested next steps are:
 
 ${roadmap}
 
-You can also book a free Cyber Career Roadmap Call here:
+You can also book a free Dr Cyber Roadmap Call here:
 
 ${settings.bookingLink}
 
 This call will help you understand which skills, certifications, and projects you should focus on first.
 
 Regards,
-Cyber Career Pathway Team`;
+${settings.senderName}`;
 
   return {
     subject: "Your Cybersecurity Career Pathway Is Ready",

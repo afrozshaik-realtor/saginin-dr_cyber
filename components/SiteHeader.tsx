@@ -8,7 +8,7 @@ export function SiteHeader({ student }: { student: Student | null }) {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link className="flex items-center gap-2 font-bold" href="/">
           <img className="h-8 w-8 rounded-full" src="/images/logo.jpg" alt="" aria-hidden="true" />
-          Cyber Career Pathway
+          Dr Cyber
         </Link>
         <nav className="flex items-center gap-5 text-sm font-semibold text-slate-600">
           <Link href="/courses">Courses</Link>

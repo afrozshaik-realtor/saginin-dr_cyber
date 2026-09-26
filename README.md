@@ -1,4 +1,4 @@
-# Cyber Career Pathway Funnel
+# Dr Cyber
 
 Marketing automation MVP for a cybersecurity career-switch funnel. It includes a landing page, 10-question pathway quiz, lead capture, personalized result page, email/SMS-ready automation, CRM-style admin dashboard, webhook endpoints, PostgreSQL/Supabase schema, and a built-in LMS for hosting the online courses.
 
@@ -133,7 +133,7 @@ Change these before deployment.
 ## Test The Funnel
 
 1. Open the landing page.
-2. Click `Take the Free Cyber Career Quiz`.
+2. Click `Take the Free Dr Cyber Quiz`.
 3. Answer all 10 questions.
 4. Submit lead details and check the consent box.
 5. Confirm redirect to `/result?id=...`.
@@ -149,7 +149,7 @@ Resend is supported by the placeholder provider:
 ```env
 EMAIL_PROVIDER=resend
 RESEND_API_KEY=re_...
-EMAIL_FROM=Cyber Career Pathway Team <hello@yourdomain.com>
+EMAIL_FROM=Dr Cyber Team <hello@yourdomain.com>
 ```
 
 SendGrid/SMTP can be added by extending `lib/services/email.ts`; the route and logging architecture are already provider-neutral.
