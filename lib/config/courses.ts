@@ -1,5 +1,5 @@
 import { pathways } from "@/lib/config/pathways";
-import type { Course, CourseModule, FlatLesson, Lesson } from "@/types/lms";
+import type { Course, CourseModule, FlatLesson, Lesson, TextLesson } from "@/types/lms";
 
 const categoryByPathway: Record<string, string> = {
   grc: "Governance, Risk & Compliance",
@@ -48,12 +48,12 @@ function slugifyId(courseId: string, title: string, index: number) {
   return `${courseId}-${base}-${index}`;
 }
 
-function buildLesson(courseId: string, title: string, index: number, kind: "lesson" | "project"): Lesson {
+function buildLesson(courseId: string, title: string, index: number, kind: "lesson" | "project"): TextLesson {
   const id = slugifyId(courseId, title, index);
   return {
     id,
     title,
-    type: "text",
+    kind: "text",
     durationMinutes: kind === "project" ? 90 : 45,
     summary: kind === "project" ? `Portfolio project: ${title}` : `Core lesson: ${title}`,
     content:
@@ -78,27 +78,31 @@ function buildModules(courseId: string, roadmap: string[], projects: string[]): 
   ];
 }
 
-export const courses: Course[] = pathways.map((pathway) => {
-  const level = levelByPathway[pathway.id] || "Beginner";
-  return {
-    id: pathway.id,
-    slug: pathway.id,
-    pathwayId: pathway.id,
-    title: pathway.name,
-    category: categoryByPathway[pathway.id] || "Cybersecurity",
-    level,
-    summary: pathway.bestFor,
-    description: pathway.why,
-    certification: pathway.certification,
-    image: imageByPathway[pathway.id] || "/images/career-switcher-study.png",
-    priceCents: priceCentsByLevel[level],
-    currency: "usd",
-    modules: buildModules(pathway.id, pathway.roadmap, pathway.projects)
-  };
-});
-
-export function getCourseBySlug(slug: string) {
-  return courses.find((course) => course.slug === slug) || null;
+/**
+ * The starting course catalog, generated from the pathway roadmaps. Used once to seed the
+ * JSON/Postgres store the first time it's read - after that, courses live in the store and
+ * are managed from /admin/courses, not from this file.
+ */
+export function buildSeedCourses(): Course[] {
+  return pathways.map((pathway) => {
+    const level = levelByPathway[pathway.id] || "Beginner";
+    return {
+      id: pathway.id,
+      slug: pathway.id,
+      pathwayId: pathway.id,
+      title: pathway.name,
+      category: categoryByPathway[pathway.id] || "Cybersecurity",
+      level,
+      summary: pathway.bestFor,
+      description: pathway.why,
+      certification: pathway.certification,
+      image: imageByPathway[pathway.id] || "/images/career-switcher-study.png",
+      priceCents: priceCentsByLevel[level],
+      currency: "usd",
+      published: true,
+      modules: buildModules(pathway.id, pathway.roadmap, pathway.projects)
+    };
+  });
 }
 
 export function listLessonsFlat(course: Course): FlatLesson[] {
@@ -117,4 +121,20 @@ export function getTotalDuration(course: Course) {
 
 export function getLessonCount(course: Course) {
   return listLessonsFlat(course).length;
+}
+
+export function emptyLessonForKind(kind: Lesson["kind"]): Lesson {
+  const base = { id: "", title: "New lesson", durationMinutes: 15, summary: "" };
+  switch (kind) {
+    case "text":
+      return { ...base, kind: "text", content: "" };
+    case "video":
+      return { ...base, kind: "video", videoUrl: "", content: "" };
+    case "slides":
+      return { ...base, kind: "slides", slidesUrl: "", content: "" };
+    case "quiz":
+      return { ...base, kind: "quiz", questions: [] };
+    case "assignment":
+      return { ...base, kind: "assignment", instructions: "", submissionType: "link" };
+  }
 }

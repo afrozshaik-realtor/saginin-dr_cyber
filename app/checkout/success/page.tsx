@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getCourseBySlug } from "@/lib/config/courses";
 import { getStripeClient } from "@/lib/services/stripe";
-import { enrollStudent, getEnrollment } from "@/lib/store";
+import { enrollStudent, getCourseBySlug, getEnrollment } from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
 
 export default async function CheckoutSuccessPage({
@@ -12,7 +11,7 @@ export default async function CheckoutSuccessPage({
   searchParams: { session_id?: string; slug?: string };
 }) {
   const slug = searchParams.slug || "";
-  const course = getCourseBySlug(slug);
+  const course = await getCourseBySlug(slug);
   if (!course) redirect("/courses");
 
   const student = await requireStudent(`/checkout/success?slug=${slug}`);

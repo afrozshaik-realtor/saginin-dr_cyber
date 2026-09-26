@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCourseBySlug } from "@/lib/config/courses";
-import { getStudentById } from "@/lib/store";
+import { getCourseBySlug, getStudentById } from "@/lib/store";
 import { setStudentSession, verifyAccessToken } from "@/lib/studentAuth";
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
 
   const [student, course] = await Promise.all([
     getStudentById(payload.studentId),
-    Promise.resolve(getCourseBySlug(payload.courseSlug))
+    getCourseBySlug(payload.courseSlug)
   ]);
   if (!student || !course) {
     return NextResponse.redirect(`${appUrl}/login?error=expired`);

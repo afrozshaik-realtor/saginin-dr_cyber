@@ -1,8 +1,18 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { buildSeedCourses } from "@/lib/config/courses";
 import type { FunnelLead, MessageLog, PipelineRecord, QuizResponseRecord } from "@/types/funnel";
-import type { Enrollment, LessonProgressRecord, Student } from "@/types/lms";
+import type {
+  AssignmentSubmission,
+  Course,
+  CourseModule,
+  Enrollment,
+  Lesson,
+  LessonProgressRecord,
+  QuizAttempt,
+  Student
+} from "@/types/lms";
 
 type EventRecord = {
   id: string;
@@ -24,6 +34,9 @@ type DataStore = {
   students: Student[];
   enrollments: Enrollment[];
   lessonProgress: LessonProgressRecord[];
+  courses: Course[];
+  quizAttempts: QuizAttempt[];
+  assignmentSubmissions: AssignmentSubmission[];
 };
 
 const dataDir = path.join(process.cwd(), ".data");
@@ -39,16 +52,25 @@ const emptyStore = (): DataStore => ({
   settings: {},
   students: [],
   enrollments: [],
-  lessonProgress: []
+  lessonProgress: [],
+  courses: [],
+  quizAttempts: [],
+  assignmentSubmissions: []
 });
 
 async function readStore(): Promise<DataStore> {
+  let store: DataStore;
   try {
     const raw = await fs.readFile(dataFile, "utf8");
-    return { ...emptyStore(), ...JSON.parse(raw) };
+    store = { ...emptyStore(), ...JSON.parse(raw) };
   } catch {
-    return emptyStore();
+    store = emptyStore();
   }
+  if (!store.courses.length) {
+    store.courses = buildSeedCourses();
+    await writeStore(store);
+  }
+  return store;
 }
 
 async function writeStore(store: DataStore) {
@@ -352,4 +374,240 @@ export async function listStudentsWithStats() {
       enrollments: store.enrollments.filter((enrollment) => enrollment.studentId === student.id)
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// --- Courses ---
+
+export async function listCourses() {
+  const store = await readStore();
+  return store.courses.filter((course) => course.published);
+}
+
+export async function listAllCoursesAdmin() {
+  const store = await readStore();
+  return store.courses;
+}
+
+export async function getCourseBySlug(slug: string) {
+  const store = await readStore();
+  return store.courses.find((course) => course.slug === slug) || null;
+}
+
+export async function getCourseById(id: string) {
+  const store = await readStore();
+  return store.courses.find((course) => course.id === id) || null;
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+export async function createCourse(input: {
+  title: string;
+  category: string;
+  level: Course["level"];
+  summary: string;
+  description: string;
+  certification: string;
+  image: string;
+  priceCents: number;
+  currency: string;
+  published: boolean;
+}) {
+  const store = await readStore();
+  const baseSlug = slugify(input.title) || randomUUID();
+  let slug = baseSlug;
+  let suffix = 1;
+  while (store.courses.some((course) => course.slug === slug)) {
+    slug = `${baseSlug}-${++suffix}`;
+  }
+  const course: Course = {
+    ...input,
+    id: randomUUID(),
+    slug,
+    pathwayId: "",
+    modules: []
+  };
+  store.courses.push(course);
+  await writeStore(store);
+  return course;
+}
+
+export async function updateCourse(
+  id: string,
+  patch: Partial<{
+    title: string;
+    category: string;
+    level: Course["level"];
+    summary: string;
+    description: string;
+    certification: string;
+    image: string;
+    priceCents: number;
+    currency: string;
+    published: boolean;
+  }>
+) {
+  const store = await readStore();
+  const course = store.courses.find((item) => item.id === id);
+  if (!course) return null;
+  Object.assign(course, patch);
+  await writeStore(store);
+  return course;
+}
+
+export async function deleteCourse(id: string) {
+  const store = await readStore();
+  store.courses = store.courses.filter((course) => course.id !== id);
+  await writeStore(store);
+}
+
+export async function addModule(courseId: string, title: string) {
+  const store = await readStore();
+  const course = store.courses.find((item) => item.id === courseId);
+  if (!course) return null;
+  const courseModule: CourseModule = { id: randomUUID(), title, lessons: [] };
+  course.modules.push(courseModule);
+  await writeStore(store);
+  return courseModule;
+}
+
+export async function updateModule(courseId: string, moduleId: string, title: string) {
+  const store = await readStore();
+  const courseModule = store.courses.find((c) => c.id === courseId)?.modules.find((m) => m.id === moduleId);
+  if (!courseModule) return null;
+  courseModule.title = title;
+  await writeStore(store);
+  return courseModule;
+}
+
+export async function deleteModule(courseId: string, moduleId: string) {
+  const store = await readStore();
+  const course = store.courses.find((c) => c.id === courseId);
+  if (!course) return;
+  course.modules = course.modules.filter((m) => m.id !== moduleId);
+  await writeStore(store);
+}
+
+export async function reorderModules(courseId: string, moduleIds: string[]) {
+  const store = await readStore();
+  const course = store.courses.find((c) => c.id === courseId);
+  if (!course) return;
+  const byId = new Map(course.modules.map((m) => [m.id, m]));
+  course.modules = moduleIds.map((id) => byId.get(id)).filter((m): m is CourseModule => Boolean(m));
+  await writeStore(store);
+}
+
+export async function addLesson(courseId: string, moduleId: string, lesson: Omit<Lesson, "id">) {
+  const store = await readStore();
+  const courseModule = store.courses.find((c) => c.id === courseId)?.modules.find((m) => m.id === moduleId);
+  if (!courseModule) return null;
+  const newLesson = { ...lesson, id: randomUUID() } as Lesson;
+  courseModule.lessons.push(newLesson);
+  await writeStore(store);
+  return newLesson;
+}
+
+export async function updateLesson(courseId: string, moduleId: string, lessonId: string, lesson: Omit<Lesson, "id">) {
+  const store = await readStore();
+  const courseModule = store.courses.find((c) => c.id === courseId)?.modules.find((m) => m.id === moduleId);
+  if (!courseModule) return null;
+  const index = courseModule.lessons.findIndex((l) => l.id === lessonId);
+  if (index < 0) return null;
+  courseModule.lessons[index] = { ...lesson, id: lessonId } as Lesson;
+  await writeStore(store);
+  return courseModule.lessons[index];
+}
+
+export async function deleteLesson(courseId: string, moduleId: string, lessonId: string) {
+  const store = await readStore();
+  const courseModule = store.courses.find((c) => c.id === courseId)?.modules.find((m) => m.id === moduleId);
+  if (!courseModule) return;
+  courseModule.lessons = courseModule.lessons.filter((l) => l.id !== lessonId);
+  await writeStore(store);
+}
+
+export async function reorderLessons(courseId: string, moduleId: string, lessonIds: string[]) {
+  const store = await readStore();
+  const courseModule = store.courses.find((c) => c.id === courseId)?.modules.find((m) => m.id === moduleId);
+  if (!courseModule) return;
+  const byId = new Map(courseModule.lessons.map((l) => [l.id, l]));
+  courseModule.lessons = lessonIds.map((id) => byId.get(id)).filter((l): l is Lesson => Boolean(l));
+  await writeStore(store);
+}
+
+// --- Quiz attempts ---
+
+export async function recordQuizAttempt(input: Omit<QuizAttempt, "id" | "submittedAt">) {
+  const store = await readStore();
+  const attempt: QuizAttempt = { ...input, id: randomUUID(), submittedAt: new Date().toISOString() };
+  store.quizAttempts.push(attempt);
+  await writeStore(store);
+  return attempt;
+}
+
+export async function getLatestQuizAttempt(studentId: string, lessonId: string) {
+  const store = await readStore();
+  return (
+    store.quizAttempts
+      .filter((attempt) => attempt.studentId === studentId && attempt.lessonId === lessonId)
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))[0] || null
+  );
+}
+
+// --- Assignment submissions ---
+
+export async function createAssignmentSubmission(
+  input: Omit<AssignmentSubmission, "id" | "submittedAt" | "status" | "feedback" | "reviewedAt">
+) {
+  const store = await readStore();
+  const existingIndex = store.assignmentSubmissions.findIndex(
+    (submission) => submission.studentId === input.studentId && submission.lessonId === input.lessonId
+  );
+  const submission: AssignmentSubmission = {
+    ...input,
+    id: store.assignmentSubmissions[existingIndex]?.id || randomUUID(),
+    status: "submitted",
+    submittedAt: new Date().toISOString()
+  };
+  if (existingIndex >= 0) store.assignmentSubmissions[existingIndex] = submission;
+  else store.assignmentSubmissions.push(submission);
+  await writeStore(store);
+  return submission;
+}
+
+export async function getAssignmentSubmission(studentId: string, lessonId: string) {
+  const store = await readStore();
+  return (
+    store.assignmentSubmissions.find(
+      (submission) => submission.studentId === studentId && submission.lessonId === lessonId
+    ) || null
+  );
+}
+
+export async function getAssignmentSubmissionByFileUrl(fileUrl: string) {
+  const store = await readStore();
+  return store.assignmentSubmissions.find((submission) => submission.fileUrl === fileUrl) || null;
+}
+
+export async function reviewAssignmentSubmission(id: string, feedback: string) {
+  const store = await readStore();
+  const submission = store.assignmentSubmissions.find((item) => item.id === id);
+  if (!submission) return null;
+  submission.status = "reviewed";
+  submission.feedback = feedback;
+  submission.reviewedAt = new Date().toISOString();
+  await writeStore(store);
+  return submission;
+}
+
+export async function listAllSubmissions() {
+  const store = await readStore();
+  return store.assignmentSubmissions
+    .slice()
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }

@@ -30,6 +30,10 @@ export function requireAdmin() {
   }
 }
 
+export function isAdminSession() {
+  return cookies().get(cookieName)?.value === "authenticated";
+}
+
 export function clearAdminSession() {
   cookies().delete(cookieName);
 }

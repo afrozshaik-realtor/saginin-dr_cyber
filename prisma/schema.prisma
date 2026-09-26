@@ -152,3 +152,61 @@ model LessonProgress {
   @@unique([studentId, lessonId])
   @@map("lesson_progress")
 }
+
+/// Modules and lessons (including quiz questions and assignment config) are stored as a single
+/// JSON tree on `modulesJson`, matching the JSON-store shape in types/lms.ts (Course.modules).
+/// Course content is managed from /admin/courses, not migrated by hand - a normalized relational
+/// schema can replace this later if the catalog grows large enough to need querying into lessons.
+model Course {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  pathwayId     String?  @map("pathway_id")
+  title         String
+  category      String
+  level         String
+  summary       String
+  description   String
+  certification String?
+  image         String
+  priceCents    Int      @map("price_cents")
+  currency      String
+  published     Boolean  @default(true)
+  modulesJson   Json     @map("modules_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("courses")
+}
+
+model QuizAttempt {
+  id            String   @id @default(cuid())
+  studentId     String   @map("student_id")
+  courseId      String   @map("course_id")
+  lessonId      String   @map("lesson_id")
+  answersJson   Json     @map("answers_json")
+  scorePercent  Int      @map("score_percent")
+  correctCount  Int      @map("correct_count")
+  totalCount    Int      @map("total_count")
+  submittedAt   DateTime @default(now()) @map("submitted_at")
+
+  @@map("quiz_attempts")
+}
+
+model AssignmentSubmission {
+  id             String    @id @default(cuid())
+  studentId      String    @map("student_id")
+  courseId       String    @map("course_id")
+  lessonId       String    @map("lesson_id")
+  submissionType String    @map("submission_type")
+  fileUrl        String?   @map("file_url")
+  fileName       String?   @map("file_name")
+  link           String?
+  text           String?
+  status         String    @default("submitted")
+  feedback       String?
+  submittedAt    DateTime  @default(now()) @map("submitted_at")
+  reviewedAt     DateTime? @map("reviewed_at")
+
+  @@unique([studentId, lessonId])
+  @@map("assignment_submissions")
+}

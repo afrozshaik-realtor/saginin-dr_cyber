@@ -2,14 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getCourseBySlug } from "@/lib/config/courses";
+import { findLesson } from "@/lib/config/courses";
 import { createCheckoutSession } from "@/lib/services/stripe";
+import { saveUploadedFile } from "@/lib/services/storage";
 import {
+  createAssignmentSubmission,
   createStudent,
   enrollStudent,
+  getCourseBySlug,
   getEnrollment,
   getStudentByEmail,
   getStudentById,
+  recordQuizAttempt,
   setLessonProgress
 } from "@/lib/store";
 import {
@@ -80,7 +84,7 @@ export async function logoutAction() {
 
 export async function checkoutAction(formData: FormData) {
   const slug = String(formData.get("slug") || "");
-  const course = getCourseBySlug(slug);
+  const course = await getCourseBySlug(slug);
   if (!course) redirect("/courses");
 
   const studentId = getStudentSessionId();
@@ -126,11 +130,87 @@ export async function toggleLessonAction(formData: FormData) {
   const slug = String(formData.get("slug") || "");
   const lessonId = String(formData.get("lessonId") || "");
   const completed = String(formData.get("completed") || "false") === "true";
-  const course = getCourseBySlug(slug);
+  const course = await getCourseBySlug(slug);
   if (!course) redirect("/courses");
 
   const student = await requireStudent(`/learn/${slug}`);
   await setLessonProgress(student.id, course!.id, lessonId, completed);
   revalidatePath(`/learn/${slug}`);
   revalidatePath("/dashboard");
+}
+
+export async function submitQuizAction(formData: FormData) {
+  const slug = String(formData.get("slug") || "");
+  const lessonId = String(formData.get("lessonId") || "");
+  const course = await getCourseBySlug(slug);
+  if (!course) redirect("/courses");
+
+  const student = await requireStudent(`/learn/${slug}`);
+  const lesson = findLesson(course!, lessonId);
+  if (!lesson || lesson.kind !== "quiz") redirect(`/learn/${slug}`);
+
+  const answers: Record<string, string> = {};
+  let correctCount = 0;
+  for (const question of lesson!.questions) {
+    const selected = String(formData.get(`question-${question.id}`) || "");
+    answers[question.id] = selected;
+    const correctOption = question.options.find((option) => option.correct);
+    if (correctOption && correctOption.id === selected) correctCount += 1;
+  }
+  const totalCount = lesson!.questions.length;
+  const scorePercent = totalCount ? Math.round((correctCount / totalCount) * 100) : 0;
+
+  await recordQuizAttempt({
+    studentId: student.id,
+    courseId: course!.id,
+    lessonId,
+    answers,
+    scorePercent,
+    correctCount,
+    totalCount
+  });
+  await setLessonProgress(student.id, course!.id, lessonId, true);
+  revalidatePath(`/learn/${slug}`);
+  revalidatePath("/dashboard");
+  redirect(`/learn/${slug}?lesson=${lessonId}`);
+}
+
+export async function submitAssignmentAction(formData: FormData) {
+  const slug = String(formData.get("slug") || "");
+  const lessonId = String(formData.get("lessonId") || "");
+  const course = await getCourseBySlug(slug);
+  if (!course) redirect("/courses");
+
+  const student = await requireStudent(`/learn/${slug}`);
+  const lesson = findLesson(course!, lessonId);
+  if (!lesson || lesson.kind !== "assignment") redirect(`/learn/${slug}`);
+
+  const submission: Parameters<typeof createAssignmentSubmission>[0] = {
+    studentId: student.id,
+    courseId: course!.id,
+    lessonId,
+    submissionType: lesson!.submissionType
+  };
+
+  if (lesson!.submissionType === "link") {
+    submission.link = String(formData.get("link") || "").trim();
+    if (!submission.link) redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
+  } else if (lesson!.submissionType === "text") {
+    submission.text = String(formData.get("text") || "").trim();
+    if (!submission.text) redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
+  } else {
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
+    }
+    const uploaded = await saveUploadedFile(file as File, `assignments/${student.id}/${lessonId}`);
+    submission.fileUrl = uploaded.url;
+    submission.fileName = (file as File).name;
+  }
+
+  await createAssignmentSubmission(submission);
+  await setLessonProgress(student.id, course!.id, lessonId, true);
+  revalidatePath(`/learn/${slug}`);
+  revalidatePath("/dashboard");
+  redirect(`/learn/${slug}?lesson=${lessonId}`);
 }
