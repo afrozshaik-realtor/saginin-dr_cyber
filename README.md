@@ -37,7 +37,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 2. Emails them a branded HTML message (logo banner, using `LOGO_URL` if set, otherwise a text wordmark) with a one-click "Start learning" link.
 3. That link (`/access/[token]`) is a signed, 7-day magic link - it signs the student in automatically (no password needed) and drops them straight into `/learn/[slug]`.
 
-Set `LOGO_URL` to a publicly reachable image URL to brand the email with your actual logo; leave it blank to use the text-based fallback banner.
+The site logo lives at `public/images/logo.jpg` and doubles as the favicon (`app/icon.png`), the header/admin-nav mark, and the default email logo - `LOGO_URL` defaults to `{APP_URL}/images/logo.jpg` so branded emails work with no extra config once `APP_URL` is set to a publicly reachable domain (e.g. `https://app.drcyber.com`). Set `LOGO_URL` explicitly to override it with a different image.
 
 ## Run Locally
 
@@ -197,11 +197,12 @@ Send `x-webhook-secret` when `WEBHOOK_SHARED_SECRET` is configured. This endpoin
 
 1. Push to GitHub.
 2. Import into Vercel.
-3. Add all environment variables.
+3. Add all environment variables, including `APP_URL=https://app.drcyber.com` (used for Stripe redirect URLs, magic links, and email branding).
 4. Create a Supabase/PostgreSQL database and set `DATABASE_URL`.
 5. Run Prisma migration/seed from a local machine or deployment job.
 6. Configure your email domain and provider.
 7. Add Calendly and optional Twilio credentials.
+8. Point `app.drcyber.com` at the deployment and add it as a Stripe webhook endpoint (`https://app.drcyber.com/api/webhooks/stripe`).
 
 ## Editable Funnel Config
 

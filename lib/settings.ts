@@ -1,6 +1,7 @@
 export function appSettings() {
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
   return {
-    appUrl: process.env.APP_URL || "http://localhost:3000",
+    appUrl,
     bookingLink:
       process.env.BOOKING_LINK || "https://calendly.com/your-team/cyber-career-roadmap-call",
     masterclassLink: process.env.MASTERCLASS_LINK || "https://example.com/masterclass",
@@ -8,6 +9,6 @@ export function appSettings() {
     senderName: process.env.DEFAULT_SENDER_NAME || "Cyber Career Pathway Team",
     cohortName: process.env.PROGRAM_COHORT_NAME || "Cyber Career Switch Program",
     smsEnabled: process.env.SMS_ENABLED === "true",
-    logoUrl: process.env.LOGO_URL || ""
+    logoUrl: process.env.LOGO_URL || `${appUrl}/images/logo.jpg`
   };
 }
