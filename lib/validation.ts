@@ -42,6 +42,12 @@ export const studentLoginSchema = z.object({
   password: z.string().min(1).max(100)
 });
 
+export const grantAccessSchema = z.object({
+  email: z.string().email().max(160),
+  name: z.string().max(120).optional().or(z.literal("")),
+  slug: z.string().min(1).max(80)
+});
+
 export const leadPatchSchema = z.object({
   stage: z.string().optional(),
   status: z.string().optional(),

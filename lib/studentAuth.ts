@@ -65,3 +65,34 @@ export function hashPassword(password: string) {
 export function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
+
+const ACCESS_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+
+function signAccessPayload(payload: string) {
+  return createHmac("sha256", secret()).update(payload).digest("hex");
+}
+
+export function createAccessToken(studentId: string, courseSlug: string) {
+  const payload = JSON.stringify({ s: studentId, c: courseSlug, e: Date.now() + ACCESS_TOKEN_TTL_MS });
+  const encoded = Buffer.from(payload).toString("base64url");
+  return `${encoded}.${signAccessPayload(encoded)}`;
+}
+
+export function verifyAccessToken(token: string): { studentId: string; courseSlug: string } | null {
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+
+  const expected = signAccessPayload(encoded);
+  const provided = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (provided.length !== expectedBuffer.length || !timingSafeEqual(provided, expectedBuffer)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString());
+    if (typeof payload.s !== "string" || typeof payload.c !== "string" || typeof payload.e !== "number") return null;
+    if (Date.now() > payload.e) return null;
+    return { studentId: payload.s, courseSlug: payload.c };
+  } catch {
+    return null;
+  }
+}

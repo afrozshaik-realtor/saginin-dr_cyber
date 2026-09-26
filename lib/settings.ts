@@ -7,6 +7,7 @@ export function appSettings() {
     adminNotificationEmail: process.env.ADMIN_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL || "",
     senderName: process.env.DEFAULT_SENDER_NAME || "Cyber Career Pathway Team",
     cohortName: process.env.PROGRAM_COHORT_NAME || "Cyber Career Switch Program",
-    smsEnabled: process.env.SMS_ENABLED === "true"
+    smsEnabled: process.env.SMS_ENABLED === "true",
+    logoUrl: process.env.LOGO_URL || ""
   };
 }

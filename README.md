@@ -29,6 +29,16 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - If `STRIPE_SECRET_KEY` is not set, "Enroll" falls back to enrolling the student directly (marked `dev-mode`, no payment) so the app stays testable without live Stripe keys - unset this before deploying somewhere real users can reach it.
 - Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`); change them there.
 
+### Admin-granted access (no payment)
+
+`/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:
+
+1. Enrolls that email in the course (creating a student account automatically if the email is new), marked `granted`.
+2. Emails them a branded HTML message (logo banner, using `LOGO_URL` if set, otherwise a text wordmark) with a one-click "Start learning" link.
+3. That link (`/access/[token]`) is a signed, 7-day magic link - it signs the student in automatically (no password needed) and drops them straight into `/learn/[slug]`.
+
+Set `LOGO_URL` to a publicly reachable image URL to brand the email with your actual logo; leave it blank to use the text-based fallback banner.
+
 ## Run Locally
 
 1. Install dependencies:
