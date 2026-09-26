@@ -37,7 +37,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 2. Emails them a branded HTML message (logo banner, using `LOGO_URL` if set, otherwise a text wordmark) with a one-click "Start learning" link.
 3. That link (`/access/[token]`) is a signed, 7-day magic link - it signs the student in automatically (no password needed) and drops them straight into `/learn/[slug]`.
 
-The site logo lives at `public/images/logo.jpg` and doubles as the favicon (`app/icon.png`), the header/admin-nav mark, and the default email logo - `LOGO_URL` defaults to `{APP_URL}/images/logo.jpg` so branded emails work with no extra config once `APP_URL` is set to a publicly reachable domain (e.g. `https://app.drcyber.com`). Set `LOGO_URL` explicitly to override it with a different image.
+The site logo lives at `public/images/logo.jpg` and doubles as the favicon (`app/icon.png`), the header/admin-nav mark, and the default email logo - `LOGO_URL` defaults to `{APP_URL}/images/logo.jpg` so branded emails work with no extra config once `APP_URL` is set to a publicly reachable domain (e.g. `https://app.drcyber.ca`). Set `LOGO_URL` explicitly to override it with a different image.
 
 ## Run Locally
 
@@ -195,14 +195,28 @@ Send `x-webhook-secret` when `WEBHOOK_SHARED_SECRET` is configured. This endpoin
 
 ## Deploy
 
-1. Push to GitHub.
-2. Import into Vercel.
-3. Add all environment variables, including `APP_URL=https://app.drcyber.com` (used for Stripe redirect URLs, magic links, and email branding).
-4. Create a Supabase/PostgreSQL database and set `DATABASE_URL`.
-5. Run Prisma migration/seed from a local machine or deployment job.
-6. Configure your email domain and provider.
-7. Add Calendly and optional Twilio credentials.
-8. Point `app.drcyber.com` at the deployment and add it as a Stripe webhook endpoint (`https://app.drcyber.com/api/webhooks/stripe`).
+Production target is `app.drcyber.ca` on Hostinger. This is a Next.js app with API routes/server actions/cookies, so it needs a persistent Node.js process - it cannot run on a static/shared-only hosting plan.
+
+### Hostinger VPS (works on any VPS plan)
+
+1. SSH into the VPS (IP/credentials from hPanel -> VPS -> your VPS).
+2. Install Node 20+, git, and PM2: `curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs git && npm install -g pm2`.
+3. Clone the repo and `cd` into it, copy `.env.example` to `.env` and fill in real values (at minimum `APP_URL=https://app.drcyber.ca`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`).
+4. `npm install && npm run build`.
+5. `pm2 start npm --name dr-cyber -- start && pm2 save && pm2 startup` (app listens on port 3000).
+6. Install Nginx and reverse-proxy `app.drcyber.ca` -> `localhost:3000`, then `certbot --nginx -d app.drcyber.ca` for HTTPS.
+7. In hPanel -> Domains -> `drcyber.ca` -> DNS Zone Editor, add an A record: name `app`, value = the VPS IP.
+8. To redeploy: `git pull && npm install && npm run build && pm2 restart dr-cyber`.
+
+### Hostinger hPanel Node.js app (if your plan has it)
+
+hPanel -> Websites -> your site -> Advanced -> Node.js. Set the app root/startup and env vars there, upload the repo (Git or SFTP), then `npm install && npm run build && npm run start` from the panel's terminal. Point `app.drcyber.ca` at it via the DNS zone editor. Menu names vary by plan/region.
+
+### Either way
+
+- Add all environment variables, including Stripe keys once ready, and register the webhook `https://app.drcyber.ca/api/webhooks/stripe`.
+- The app works with its local JSON store out of the box (`.data/store.json`), but that's disk-local and not backed up. For real production data, use a Postgres database (Hostinger doesn't offer managed Postgres - Supabase's free tier is the easiest option, or Postgres on the same VPS), set `DATABASE_URL`, and run `npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed`.
+- Configure your email domain/provider and add Calendly/Twilio credentials.
 
 ## Editable Funnel Config
 
