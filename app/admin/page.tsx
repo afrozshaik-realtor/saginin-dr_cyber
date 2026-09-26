@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminNav } from "@/components/AdminNav";
+import { formatPrice } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 import { getMetrics } from "@/lib/store";
 
@@ -13,7 +14,8 @@ export default async function AdminDashboard() {
     ["Enrolled students", metrics.enrolled],
     ["Quiz to call conversion", `${metrics.conversionRate}%`],
     ["LMS students", metrics.totalStudents],
-    ["Course enrollments", metrics.totalEnrollments]
+    ["Course enrollments", metrics.totalEnrollments],
+    ["Course revenue", formatPrice(metrics.totalRevenueCents, "usd")]
   ];
 
   return (

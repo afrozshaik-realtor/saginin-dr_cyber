@@ -23,6 +23,12 @@ const levelByPathway: Record<string, Course["level"]> = {
   foundation: "Beginner"
 };
 
+const priceCentsByLevel: Record<Course["level"], number> = {
+  Beginner: 14900,
+  Intermediate: 19900,
+  Advanced: 24900
+};
+
 const imageByPathway: Record<string, string> = {
   grc: "/images/mentor-consultation.png",
   soc: "/images/hands-on-lab.png",
@@ -72,19 +78,24 @@ function buildModules(courseId: string, roadmap: string[], projects: string[]): 
   ];
 }
 
-export const courses: Course[] = pathways.map((pathway) => ({
-  id: pathway.id,
-  slug: pathway.id,
-  pathwayId: pathway.id,
-  title: pathway.name,
-  category: categoryByPathway[pathway.id] || "Cybersecurity",
-  level: levelByPathway[pathway.id] || "Beginner",
-  summary: pathway.bestFor,
-  description: pathway.why,
-  certification: pathway.certification,
-  image: imageByPathway[pathway.id] || "/images/career-switcher-study.png",
-  modules: buildModules(pathway.id, pathway.roadmap, pathway.projects)
-}));
+export const courses: Course[] = pathways.map((pathway) => {
+  const level = levelByPathway[pathway.id] || "Beginner";
+  return {
+    id: pathway.id,
+    slug: pathway.id,
+    pathwayId: pathway.id,
+    title: pathway.name,
+    category: categoryByPathway[pathway.id] || "Cybersecurity",
+    level,
+    summary: pathway.bestFor,
+    description: pathway.why,
+    certification: pathway.certification,
+    image: imageByPathway[pathway.id] || "/images/career-switcher-study.png",
+    priceCents: priceCentsByLevel[level],
+    currency: "usd",
+    modules: buildModules(pathway.id, pathway.roadmap, pathway.projects)
+  };
+});
 
 export function getCourseBySlug(slug: string) {
   return courses.find((course) => course.slug === slug) || null;

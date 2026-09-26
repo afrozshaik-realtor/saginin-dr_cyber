@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
-import { enrollAction } from "@/lib/actions/lms";
+import { checkoutAction } from "@/lib/actions/lms";
 import { getCourseBySlug, getLessonCount, getTotalDuration } from "@/lib/config/courses";
+import { formatPrice } from "@/lib/format";
 import { getEnrollment } from "@/lib/store";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
@@ -10,7 +11,18 @@ export function generateMetadata({ params }: { params: { slug: string } }) {
   return { title: course ? `${course.title} | Cyber Career Pathway` : "Course not found" };
 }
 
-export default async function CourseDetailPage({ params }: { params: { slug: string } }) {
+const checkoutMessages: Record<string, string> = {
+  cancelled: "Checkout was cancelled - your card was not charged.",
+  error: "We could not start checkout. Please try again."
+};
+
+export default async function CourseDetailPage({
+  params,
+  searchParams
+}: {
+  params: { slug: string };
+  searchParams: { checkout?: string };
+}) {
   const course = getCourseBySlug(params.slug);
   if (!course) notFound();
 
@@ -18,6 +30,8 @@ export default async function CourseDetailPage({ params }: { params: { slug: str
   const enrollment = student ? await getEnrollment(student.id, course!.id) : null;
   const lessonCount = getLessonCount(course!);
   const hours = Math.round((getTotalDuration(course!) / 60) * 10) / 10;
+  const price = formatPrice(course!.priceCents, course!.currency);
+  const checkoutMessage = searchParams.checkout ? checkoutMessages[searchParams.checkout] : undefined;
 
   return (
     <main className="min-h-screen bg-cloud">
@@ -35,7 +49,10 @@ export default async function CourseDetailPage({ params }: { params: { slug: str
               </span>
               <span>Certification target: {course!.certification}</span>
             </div>
-            <div className="mt-8">
+            {checkoutMessage ? (
+              <p className="mt-4 rounded-md border border-white/20 bg-white/10 px-4 py-3 text-sm">{checkoutMessage}</p>
+            ) : null}
+            <div className="mt-8 flex items-center gap-4">
               {enrollment ? (
                 <a
                   className="focus-ring inline-flex items-center justify-center rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
@@ -44,16 +61,17 @@ export default async function CourseDetailPage({ params }: { params: { slug: str
                   Continue learning
                 </a>
               ) : (
-                <form action={enrollAction}>
+                <form action={checkoutAction}>
                   <input type="hidden" name="slug" value={course!.slug} />
                   <button
                     className="focus-ring inline-flex items-center justify-center rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
                     type="submit"
                   >
-                    Enroll for free
+                    Enroll - {price}
                   </button>
                 </form>
               )}
+              {!enrollment ? <span className="text-sm text-slate-300">One-time payment - lifetime access</span> : null}
             </div>
           </div>
           <div className="overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-glow">

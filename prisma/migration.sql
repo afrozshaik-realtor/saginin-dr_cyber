@@ -95,6 +95,10 @@ CREATE TABLE IF NOT EXISTS enrollments (
   course_id TEXT NOT NULL,
   enrolled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
+  payment_status TEXT NOT NULL DEFAULT 'unpaid',
+  amount_paid_cents INTEGER,
+  currency TEXT,
+  stripe_session_id TEXT UNIQUE,
   UNIQUE (student_id, course_id)
 );
 

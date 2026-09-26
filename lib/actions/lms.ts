@@ -3,10 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCourseBySlug } from "@/lib/config/courses";
+import { createCheckoutSession } from "@/lib/services/stripe";
 import {
   createStudent,
   enrollStudent,
+  getEnrollment,
   getStudentByEmail,
+  getStudentById,
   setLessonProgress
 } from "@/lib/store";
 import {
@@ -75,7 +78,7 @@ export async function logoutAction() {
   redirect("/");
 }
 
-export async function enrollAction(formData: FormData) {
+export async function checkoutAction(formData: FormData) {
   const slug = String(formData.get("slug") || "");
   const course = getCourseBySlug(slug);
   if (!course) redirect("/courses");
@@ -84,9 +87,39 @@ export async function enrollAction(formData: FormData) {
   if (!studentId) {
     redirect(`/login?redirect=${encodeURIComponent(`/courses/${slug}`)}`);
   }
+  const student = await getStudentById(studentId as string);
+  if (!student) {
+    redirect(`/login?redirect=${encodeURIComponent(`/courses/${slug}`)}`);
+  }
 
-  await enrollStudent(studentId as string, course!.id);
-  redirect(`/learn/${slug}`);
+  const existing = await getEnrollment(student!.id, course!.id);
+  if (existing) redirect(`/learn/${slug}`);
+
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  let session: Awaited<ReturnType<typeof createCheckoutSession>> = null;
+  try {
+    session = await createCheckoutSession({
+      studentId: student!.id,
+      studentEmail: student!.email,
+      course: course!,
+      successUrl: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&slug=${slug}`,
+      cancelUrl: `${appUrl}/courses/${slug}?checkout=cancelled`
+    });
+  } catch (error) {
+    console.error("Stripe checkout session creation failed", error);
+    redirect(`/courses/${slug}?checkout=error`);
+  }
+
+  if (!session) {
+    // Stripe isn't configured (no STRIPE_SECRET_KEY) - enroll directly so the app stays testable end-to-end locally.
+    await enrollStudent(student!.id, course!.id, { paymentStatus: "dev-mode" });
+    redirect(`/learn/${slug}`);
+  }
+  if (!session.url) {
+    redirect(`/courses/${slug}?checkout=error`);
+  }
+
+  redirect(session.url);
 }
 
 export async function toggleLessonAction(formData: FormData) {

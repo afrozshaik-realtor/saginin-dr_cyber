@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getLessonCount, getTotalDuration } from "@/lib/config/courses";
+import { formatPrice } from "@/lib/format";
 import type { Course } from "@/types/lms";
 
 export function CourseCard({ course }: { course: Course }) {
   const lessonCount = getLessonCount(course);
   const hours = Math.round((getTotalDuration(course) / 60) * 10) / 10;
+  const price = formatPrice(course.priceCents, course.currency);
 
   return (
     <Link
@@ -22,6 +24,7 @@ export function CourseCard({ course }: { course: Course }) {
             {lessonCount} lessons - {hours}h
           </span>
         </div>
+        <p className="mt-3 text-lg font-bold text-ink">{price}</p>
       </div>
     </Link>
   );

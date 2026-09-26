@@ -229,7 +229,10 @@ export async function getMetrics() {
     leadsByPathway,
     recentLeads: store.leads.slice(-8).reverse(),
     totalStudents: store.students.length,
-    totalEnrollments: store.enrollments.length
+    totalEnrollments: store.enrollments.length,
+    totalRevenueCents: store.enrollments
+      .filter((enrollment) => enrollment.paymentStatus === "paid")
+      .reduce((sum, enrollment) => sum + (enrollment.amountPaidCents || 0), 0)
   };
 }
 
@@ -259,19 +262,34 @@ export async function getStudentById(id: string) {
   return store.students.find((student) => student.id === id) || null;
 }
 
-export async function enrollStudent(studentId: string, courseId: string) {
+export async function enrollStudent(
+  studentId: string,
+  courseId: string,
+  payment: {
+    paymentStatus: Enrollment["paymentStatus"];
+    amountPaidCents?: number;
+    currency?: string;
+    stripeSessionId?: string;
+  }
+) {
   const store = await readStore();
-  const existing = store.enrollments.find(
+  const existingIndex = store.enrollments.findIndex(
     (enrollment) => enrollment.studentId === studentId && enrollment.courseId === courseId
   );
-  if (existing) return existing;
+  const existing = store.enrollments[existingIndex];
   const enrollment: Enrollment = {
-    id: randomUUID(),
+    id: existing?.id || randomUUID(),
     studentId,
     courseId,
-    enrolledAt: new Date().toISOString()
+    enrolledAt: existing?.enrolledAt || new Date().toISOString(),
+    completedAt: existing?.completedAt,
+    paymentStatus: payment.paymentStatus,
+    amountPaidCents: payment.amountPaidCents ?? existing?.amountPaidCents,
+    currency: payment.currency ?? existing?.currency,
+    stripeSessionId: payment.stripeSessionId ?? existing?.stripeSessionId
   };
-  store.enrollments.push(enrollment);
+  if (existingIndex >= 0) store.enrollments[existingIndex] = enrollment;
+  else store.enrollments.push(enrollment);
   await writeStore(store);
   return enrollment;
 }

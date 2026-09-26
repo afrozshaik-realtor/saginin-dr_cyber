@@ -1,5 +1,6 @@
 import { AdminNav } from "@/components/AdminNav";
 import { courses } from "@/lib/config/courses";
+import { formatPrice } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 import { listStudentsWithStats } from "@/lib/store";
 
@@ -19,6 +20,7 @@ export default async function AdminStudentsPage() {
                 <th className="p-3">Name</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Enrolled courses</th>
+                <th className="p-3">Paid</th>
                 <th className="p-3">Joined</th>
               </tr>
             </thead>
@@ -32,6 +34,14 @@ export default async function AdminStudentsPage() {
                       .map((enrollment) => courses.find((course) => course.id === enrollment.courseId)?.title)
                       .filter(Boolean)
                       .join(", ") || "None"}
+                  </td>
+                  <td className="p-3">
+                    {formatPrice(
+                      student.enrollments
+                        .filter((enrollment) => enrollment.paymentStatus === "paid")
+                        .reduce((sum, enrollment) => sum + (enrollment.amountPaidCents || 0), 0),
+                      "usd"
+                    )}
                   </td>
                   <td className="p-3">{new Date(student.createdAt).toLocaleDateString()}</td>
                 </tr>

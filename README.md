@@ -4,14 +4,30 @@ Marketing automation MVP for a cybersecurity career-switch funnel. It includes a
 
 ## LMS (Online Courses)
 
-- `/courses` - public course catalog. Each of the 8 career pathways is available as a self-paced course with modules, lessons, and portfolio projects.
-- `/courses/[slug]` - course landing page with the full curriculum outline and an "Enroll for free" call to action.
+- `/courses` - public course catalog. Each of the 8 career pathways is available as a paid, self-paced course with modules, lessons, and portfolio projects.
+- `/courses/[slug]` - course landing page with the full curriculum outline and an "Enroll - $price" call to action that starts Stripe Checkout.
 - `/signup` and `/login` - student accounts, separate from the admin login, stored with a bcrypt password hash and a signed session cookie.
-- `/dashboard` - a logged-in student's enrolled courses with a progress bar per course.
+- `/dashboard` - a logged-in student's enrolled courses with a progress bar and what was paid per course.
 - `/learn/[slug]` - the lesson player: a sidebar with every module/lesson, lesson content, and a "Mark lesson complete" action that updates progress instantly.
-- `/admin/students` - admin view of every student and which courses they're enrolled in.
+- `/admin/students` - admin view of every student, their enrollments, and total paid.
 
-Course/module/lesson content is defined in code at `lib/config/courses.ts` (derived from the pathway roadmaps in `lib/config/pathways.ts`), while students, enrollments, and lesson progress are stored as data (JSON store locally, or the `students` / `enrollments` / `lesson_progress` tables in Postgres). Enrollment is free in this MVP; wire in Stripe or another billing provider before charging for a course.
+Course/module/lesson content is defined in code at `lib/config/courses.ts` (derived from the pathway roadmaps in `lib/config/pathways.ts`, with a price per course based on level), while students, enrollments, and lesson progress are stored as data (JSON store locally, or the `students` / `enrollments` / `lesson_progress` tables in Postgres).
+
+### Payments (Stripe)
+
+Courses are paid. Set:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+- "Enroll" starts a Stripe Checkout session (`lib/services/stripe.ts`) for the course price, with the student's ID/course ID in the session metadata.
+- Point a Stripe webhook at `POST /api/webhooks/stripe` listening for `checkout.session.completed`; it verifies the signature and enrolls the student once payment is confirmed.
+- `/checkout/success` also verifies the Checkout Session directly as a fallback (useful locally where the Stripe CLI isn't forwarding webhooks) and enrolls the student if it hasn't happened yet. Enrollment is idempotent either way.
+- If `STRIPE_SECRET_KEY` is not set, "Enroll" falls back to enrolling the student directly (marked `dev-mode`, no payment) so the app stays testable without live Stripe keys - unset this before deploying somewhere real users can reach it.
+- Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`); change them there.
 
 ## Run Locally
 

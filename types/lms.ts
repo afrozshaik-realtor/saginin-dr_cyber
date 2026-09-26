@@ -29,6 +29,8 @@ export type Course = {
   description: string;
   certification: string;
   image: string;
+  priceCents: number;
+  currency: string;
   modules: CourseModule[];
 };
 
@@ -45,12 +47,18 @@ export type Student = {
   createdAt: string;
 };
 
+export type PaymentStatus = "unpaid" | "paid" | "dev-mode";
+
 export type Enrollment = {
   id: string;
   studentId: string;
   courseId: string;
   enrolledAt: string;
   completedAt?: string;
+  paymentStatus: PaymentStatus;
+  amountPaidCents?: number;
+  currency?: string;
+  stripeSessionId?: string;
 };
 
 export type LessonProgressRecord = {

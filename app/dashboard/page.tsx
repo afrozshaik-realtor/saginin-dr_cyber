@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { courses, getLessonCount } from "@/lib/config/courses";
+import { formatPrice } from "@/lib/format";
 import { getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
 
@@ -16,7 +17,13 @@ export default async function DashboardPage() {
       const totalLessons = getLessonCount(course);
       const completedLessons = Object.values(progressMap).filter(Boolean).length;
       const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
-      return { course, completedLessons, totalLessons, percent };
+      const paidLabel =
+        enrollment.paymentStatus === "paid" && enrollment.amountPaidCents
+          ? `Purchased for ${formatPrice(enrollment.amountPaidCents, enrollment.currency || course.currency)}`
+          : enrollment.paymentStatus === "dev-mode"
+            ? "Enrolled (dev mode, no payment)"
+            : null;
+      return { course, completedLessons, totalLessons, percent, paidLabel };
     })
   );
 
@@ -30,11 +37,12 @@ export default async function DashboardPage() {
         <p className="mt-2 text-slate-600">Welcome back, {student.name}.</p>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {active.map(({ course, completedLessons, totalLessons, percent }) => (
+          {active.map(({ course, completedLessons, totalLessons, percent, paidLabel }) => (
             <div key={course.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <img className="aspect-[16/9] w-full object-cover" src={course.image} alt={course.title} />
               <div className="p-5">
                 <h2 className="font-bold">{course.title}</h2>
+                {paidLabel ? <p className="mt-1 text-xs text-slate-500">{paidLabel}</p> : null}
                 <p className="mt-2 text-xs font-semibold text-slate-500">
                   {completedLessons} of {totalLessons} lessons complete
                 </p>
