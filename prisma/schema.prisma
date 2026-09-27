@@ -3,36 +3,37 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model Lead {
-  id                String         @id @default(cuid())
-  firstName         String         @map("first_name")
-  lastName          String         @map("last_name")
-  email             String         @unique
+  id                String          @id @default(cuid())
+  firstName         String          @map("first_name")
+  lastName          String          @map("last_name")
+  email             String          @unique
   phone             String?
-  currentProfession String         @map("current_profession")
+  currentProfession String          @map("current_profession")
   city              String
   country           String
-  startTimeline     String         @map("start_timeline")
-  pathwayResult     String         @map("pathway_result")
-  pathwayScoreJson  Json           @map("pathway_score_json")
+  startTimeline     String          @map("start_timeline")
+  pathwayResult     String          @map("pathway_result")
+  pathwayScoreJson  Json            @map("pathway_score_json")
   source            String?
-  utmSource         String?        @map("utm_source")
-  utmMedium         String?        @map("utm_medium")
-  utmCampaign       String?        @map("utm_campaign")
-  utmContent        String?        @map("utm_content")
-  utmTerm           String?        @map("utm_term")
+  utmSource         String?         @map("utm_source")
+  utmMedium         String?         @map("utm_medium")
+  utmCampaign       String?         @map("utm_campaign")
+  utmContent        String?         @map("utm_content")
+  utmTerm           String?         @map("utm_term")
   tag               String?
-  consent           Boolean        @default(false)
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  consent           Boolean         @default(false)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
   quizResponses     QuizResponse[]
   pipelineStages    PipelineStage[]
   emailLogs         EmailLog[]
   smsLogs           SmsLog[]
+  events            Event[]
 
   @@map("leads")
 }
@@ -41,7 +42,7 @@ model QuizResponse {
   id              String   @id @default(cuid())
   leadId          String   @map("lead_id")
   questionId      String   @map("question_id")
-  questionText    String   @map("question_text")
+  questionText    String   @map("question_text") @db.Text
   selectedAnswer  String   @map("selected_answer")
   answerScoreJson Json     @map("answer_score_json")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -51,17 +52,17 @@ model QuizResponse {
 }
 
 model PipelineStage {
-  id             String    @id @default(cuid())
-  leadId         String    @map("lead_id")
-  stage          String
-  status         String
-  notes          String?
-  assignedTo     String?   @map("assigned_to")
+  id              String    @id @default(cuid())
+  leadId          String    @map("lead_id")
+  stage           String
+  status          String
+  notes           String?   @db.Text
+  assignedTo      String?   @map("assigned_to")
   lastContactedAt DateTime? @map("last_contacted_at")
-  nextFollowUpAt DateTime? @map("next_follow_up_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  nextFollowUpAt  DateTime? @map("next_follow_up_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@map("pipeline_stages")
 }
@@ -84,12 +85,27 @@ model SmsLog {
   id      String    @id @default(cuid())
   leadId  String    @map("lead_id")
   smsType String    @map("sms_type")
-  message String
+  message String    @db.Text
   status  String
   sentAt  DateTime? @map("sent_at")
   lead    Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@map("sms_logs")
+}
+
+/// Generic event/analytics log (quiz started, email sent, etc.), not tied to a lead - "leadId"
+/// is nullable and free-standing rather than a strict foreign key, since events can be logged
+/// for students/sessions with no funnel lead at all.
+model Event {
+  id           String   @id @default(cuid())
+  event        String
+  leadId       String?  @map("lead_id")
+  sessionId    String?  @map("session_id")
+  metadataJson Json?    @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@map("events")
 }
 
 model AdminUser {
@@ -125,16 +141,16 @@ model Student {
 }
 
 model Enrollment {
-  id               String    @id @default(cuid())
-  studentId        String    @map("student_id")
-  courseId         String    @map("course_id")
-  enrolledAt       DateTime  @default(now()) @map("enrolled_at")
-  completedAt      DateTime? @map("completed_at")
-  paymentStatus    String    @default("unpaid") @map("payment_status")
-  amountPaidCents  Int?      @map("amount_paid_cents")
-  currency         String?
-  stripeSessionId  String?   @unique @map("stripe_session_id")
-  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  studentId       String    @map("student_id")
+  courseId        String    @map("course_id")
+  enrolledAt      DateTime  @default(now()) @map("enrolled_at")
+  completedAt     DateTime? @map("completed_at")
+  paymentStatus   String    @default("unpaid") @map("payment_status")
+  amountPaidCents Int?      @map("amount_paid_cents")
+  currency        String?
+  stripeSessionId String?   @unique @map("stripe_session_id")
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
   @@map("enrollments")
@@ -164,8 +180,8 @@ model Course {
   title         String
   category      String
   level         String
-  summary       String
-  description   String
+  summary       String   @db.Text
+  description   String   @db.Text
   certification String?
   image         String
   priceCents    Int      @map("price_cents")
@@ -179,15 +195,15 @@ model Course {
 }
 
 model QuizAttempt {
-  id            String   @id @default(cuid())
-  studentId     String   @map("student_id")
-  courseId      String   @map("course_id")
-  lessonId      String   @map("lesson_id")
-  answersJson   Json     @map("answers_json")
-  scorePercent  Int      @map("score_percent")
-  correctCount  Int      @map("correct_count")
-  totalCount    Int      @map("total_count")
-  submittedAt   DateTime @default(now()) @map("submitted_at")
+  id           String   @id @default(cuid())
+  studentId    String   @map("student_id")
+  courseId     String   @map("course_id")
+  lessonId     String   @map("lesson_id")
+  answersJson  Json     @map("answers_json")
+  scorePercent Int      @map("score_percent")
+  correctCount Int      @map("correct_count")
+  totalCount   Int      @map("total_count")
+  submittedAt  DateTime @default(now()) @map("submitted_at")
 
   @@map("quiz_attempts")
 }
@@ -198,12 +214,12 @@ model AssignmentSubmission {
   courseId       String    @map("course_id")
   lessonId       String    @map("lesson_id")
   submissionType String    @map("submission_type")
-  fileUrl        String?   @map("file_url")
+  fileUrl        String?   @map("file_url") @db.Text
   fileName       String?   @map("file_name")
-  link           String?
-  text           String?
+  link           String?   @db.Text
+  text           String?   @db.Text
   status         String    @default("submitted")
-  feedback       String?
+  feedback       String?   @db.Text
   submittedAt    DateTime  @default(now()) @map("submitted_at")
   reviewedAt     DateTime? @map("reviewed_at")
 

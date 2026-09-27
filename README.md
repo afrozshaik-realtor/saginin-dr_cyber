@@ -1,6 +1,6 @@
 # Dr Cyber
 
-Marketing automation MVP for a cybersecurity career-switch funnel. It includes a landing page, 10-question pathway quiz, lead capture, personalized result page, email/SMS-ready automation, CRM-style admin dashboard, webhook endpoints, PostgreSQL/Supabase schema, and a built-in LMS for hosting the online courses.
+Marketing automation MVP for a cybersecurity career-switch funnel. It includes a landing page, 10-question pathway quiz, lead capture, personalized result page, email/SMS-ready automation, CRM-style admin dashboard, webhook endpoints, a MySQL schema (via Prisma), and a built-in LMS for hosting the online courses.
 
 ## LMS (Online Courses)
 
@@ -13,7 +13,7 @@ Marketing automation MVP for a cybersecurity career-switch funnel. It includes a
 - `/admin/courses` - full course editor: create/edit courses, and add, reorder, edit, or delete modules and lessons of any kind.
 - `/admin/submissions` - review assignment submissions and leave feedback.
 
-Courses, modules, and lessons are stored as data (JSON store locally, or the `courses` table - as a JSON column - in Postgres), managed entirely from `/admin/courses`. The catalog is seeded once, the first time the store is read, from the pathway roadmaps in `lib/config/pathways.ts` (via `lib/config/courses.ts`) - after that, `lib/config/courses.ts` is no longer the source of truth; edit content in the admin UI instead.
+Courses, modules, and lessons are stored as data in the `courses` table (modules/lessons live in a JSON column), managed entirely from `/admin/courses`. The catalog is seeded once, the first time it's queried, from the pathway roadmaps in `lib/config/pathways.ts` (via `lib/config/courses.ts`) - after that, `lib/config/courses.ts` is no longer the source of truth; edit content in the admin UI instead.
 
 ### Lesson kinds
 
@@ -29,7 +29,7 @@ Text/video/slides lessons keep the manual "Mark lesson complete" button; quiz an
 
 ### File uploads
 
-Assignment file submissions are saved to local disk (`.data/uploads/`, via `lib/services/storage.ts`) and served through an authenticated route (`GET /api/uploads/[...path]`) that only the submitting student or an admin can download from. This works out of the box with no extra setup, but the files live on the app server's disk only - not backed up, and lost if the server's disk is wiped (e.g. some platforms reset ephemeral storage on redeploy; verify yours doesn't before relying on this for real submissions). For real production use, swap `lib/services/storage.ts` for an S3-compatible bucket (Cloudflare R2, AWS S3) behind the same two functions.
+Assignment file submissions are saved to local disk (`.data/uploads/`, via `lib/services/storage.ts`) and served through an authenticated route (`GET /api/uploads/[...path]`) that only the submitting student or an admin can download from. This works out of the box with no extra setup, but the files live on the app server's disk only - not backed up, and lost if the server's disk is wiped (e.g. some platforms reset ephemeral storage on redeploy; verify yours doesn't before relying on this for real submissions - this is separate from the database, which now persists course/student/enrollment data independently of redeploys). For real production use, swap `lib/services/storage.ts` for an S3-compatible bucket (Cloudflare R2, AWS S3) behind the same two functions.
 
 ### Payments (Stripe)
 
@@ -80,7 +80,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-The MVP uses a local JSON store at `.data/store.json` so the funnel works immediately. For PostgreSQL/Supabase, set `DATABASE_URL`, run Prisma migration, and use `prisma/schema.prisma` plus `prisma/migration.sql` as the database reference.
+The app is backed by a MySQL database (see Database Setup below) - set `DATABASE_URL` in `.env.local` before running `npm run dev`, or nothing will load.
 
 ## Environment Variables
 
@@ -118,25 +118,23 @@ Webhooks:
 
 ## Database Setup
 
-For Supabase or PostgreSQL:
+The app requires a MySQL (or MariaDB) database - it's the persistence layer for everything: leads, students, courses, enrollments, progress, and more. Set `DATABASE_URL` to a `mysql://` connection string, then:
 
 ```bash
 npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:seed
+npx prisma db push   # creates/updates tables to match prisma/schema.prisma
+npm run prisma:seed  # optional: seeds an admin user + a sample lead
 ```
 
-The requested tables are modeled in `prisma/schema.prisma`:
+`postinstall` already runs `prisma generate` automatically after `npm install`, so hosting platforms that just run `npm install && npm run build` pick up schema changes without an extra step - but table creation (`prisma db push`, or `prisma migrate deploy` if you switch to tracked migrations) still has to be run manually against the target database.
 
-- `leads`
-- `quiz_responses`
-- `pipeline_stages`
-- `email_logs`
-- `sms_logs`
-- `admin_users`
-- `automation_settings`
+All tables are modeled in `prisma/schema.prisma`:
 
-The SQL reference is in `prisma/migration.sql`.
+- `leads`, `quiz_responses`, `pipeline_stages`, `email_logs`, `sms_logs`, `events` - the funnel/CRM
+- `students`, `enrollments`, `lesson_progress`, `courses`, `quiz_attempts`, `assignment_submissions` - the LMS
+- `admin_users`, `automation_settings` - unused by the app at runtime (kept for reference)
+
+Course content (modules/lessons, including quiz questions and assignment config) lives as a JSON column on `courses` rather than being split into further tables - see the comment on the `Course` model in `schema.prisma`.
 
 ## Admin Login
 
@@ -234,7 +232,8 @@ hPanel -> Websites -> your site -> Advanced -> Node.js. Set the app root/startup
 ### Either way
 
 - Add all environment variables, including Stripe keys once ready, and register the webhook `https://app.drcyber.ca/api/webhooks/stripe`.
-- The app works with its local JSON store out of the box (`.data/store.json`), but that's disk-local and not backed up. For real production data, use a Postgres database (Hostinger doesn't offer managed Postgres - Supabase's free tier is the easiest option, or Postgres on the same VPS), set `DATABASE_URL`, and run `npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed`.
+- The app requires `DATABASE_URL` pointing at a MySQL database - Hostinger's Business Web Hosting plan includes free MySQL databases (hPanel -> Websites -> your site -> Databases -> Management). Since the Node.js app and the database run on the same Hostinger account, `localhost:3306` works as the host with no extra "Remote MySQL" allow-listing needed. Build the connection string as `mysql://<db-user>:<db-password>@localhost:3306/<db-name>`.
+- After setting `DATABASE_URL` and deploying once (so `npm install` has run `postinstall`'s `prisma generate`), run `npx prisma db push` once against the production database to create the tables - from the hosting panel's terminal if it has one, or from any machine that can reach the database with the same `DATABASE_URL`.
 - Configure your email domain/provider and add Calendly/Twilio credentials.
 
 ## Editable Funnel Config
