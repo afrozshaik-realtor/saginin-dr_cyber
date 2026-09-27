@@ -38,7 +38,7 @@ export default async function AdminCoursesPage() {
                     <Link href={`/admin/courses/${course.id}`}>{course.title}</Link>
                   </td>
                   <td className="p-3">{course.level}</td>
-                  <td className="p-3">{formatPrice(course.priceCents, course.currency)}</td>
+                  <td className="p-3">{course.priceCents === 0 ? "Free" : formatPrice(course.priceCents, course.currency)}</td>
                   <td className="p-3">{getLessonCount(course)}</td>
                   <td className="p-3">
                     <span

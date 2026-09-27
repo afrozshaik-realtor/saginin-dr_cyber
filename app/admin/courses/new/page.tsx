@@ -1,4 +1,5 @@
 import { AdminNav } from "@/components/AdminNav";
+import { CoursePriceFields } from "@/components/CoursePriceFields";
 import { createCourseAction } from "@/lib/actions/admin";
 import { requireAdmin } from "@/lib/auth";
 
@@ -50,23 +51,7 @@ export default function NewCoursePage({ searchParams }: { searchParams: { error?
             Cover image path (e.g. /images/cyber-workshop.png)
             <input className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" name="image" required />
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-semibold">
-              Price (cents)
-              <input
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
-                name="priceCents"
-                type="number"
-                min={0}
-                defaultValue={19900}
-                required
-              />
-            </label>
-            <label className="block text-sm font-semibold">
-              Currency
-              <input className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" name="currency" defaultValue="usd" required />
-            </label>
-          </div>
+          <CoursePriceFields defaultPriceCents={19900} defaultCurrency="usd" />
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" name="published" defaultChecked />
             Published (visible in the public catalog)

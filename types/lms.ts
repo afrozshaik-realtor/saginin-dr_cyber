@@ -89,7 +89,7 @@ export type Student = {
   createdAt: string;
 };
 
-export type PaymentStatus = "unpaid" | "paid" | "dev-mode" | "granted";
+export type PaymentStatus = "unpaid" | "paid" | "dev-mode" | "granted" | "free";
 
 export type Enrollment = {
   id: string;

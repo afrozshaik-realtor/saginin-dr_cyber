@@ -45,7 +45,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - Point a Stripe webhook at `POST /api/webhooks/stripe` listening for `checkout.session.completed`; it verifies the signature and enrolls the student once payment is confirmed.
 - `/checkout/success` also verifies the Checkout Session directly as a fallback (useful locally where the Stripe CLI isn't forwarding webhooks) and enrolls the student if it hasn't happened yet. Enrollment is idempotent either way.
 - If `STRIPE_SECRET_KEY` is not set, "Enroll" falls back to enrolling the student directly (marked `dev-mode`, no payment) so the app stays testable without live Stripe keys - unset this before deploying somewhere real users can reach it.
-- Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`); change them there.
+- Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`) for the seeded catalog; change a course's price any time from `/admin/courses/[id]`.
+- **Free courses**: check "This course is free" when creating/editing a course in `/admin/courses` (locks the price to 0). Enrolling in a $0 course skips Stripe entirely and enrolls the student directly (marked `free`) - Stripe Checkout doesn't support $0 line items, so this isn't just a UI nicety, it avoids a real checkout failure.
 
 ### Admin-granted access (no payment)
 

@@ -6,7 +6,7 @@ import type { Course } from "@/types/lms";
 export function CourseCard({ course }: { course: Course }) {
   const lessonCount = getLessonCount(course);
   const hours = Math.round((getTotalDuration(course) / 60) * 10) / 10;
-  const price = formatPrice(course.priceCents, course.currency);
+  const price = course.priceCents === 0 ? "Free" : formatPrice(course.priceCents, course.currency);
 
   return (
     <Link

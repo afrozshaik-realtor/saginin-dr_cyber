@@ -137,6 +137,16 @@ export async function checkoutAction(formData: FormData) {
   const existing = await getEnrollment(student!.id, course!.id);
   if (existing) redirect(`/learn/${slug}`);
 
+  if (course!.priceCents === 0) {
+    // Free course - skip Stripe entirely. A $0 line item isn't something Stripe Checkout supports.
+    await enrollStudent(student!.id, course!.id, {
+      paymentStatus: "free",
+      amountPaidCents: 0,
+      currency: course!.currency
+    });
+    redirect(`/learn/${slug}`);
+  }
+
   const appUrl = process.env.APP_URL || "http://localhost:3000";
   let session: Awaited<ReturnType<typeof createCheckoutSession>> = null;
   try {

@@ -38,7 +38,8 @@ export default async function CourseDetailPage({
   const enrollment = student ? await getEnrollment(student.id, course!.id) : null;
   const lessonCount = getLessonCount(course!);
   const hours = Math.round((getTotalDuration(course!) / 60) * 10) / 10;
-  const price = formatPrice(course!.priceCents, course!.currency);
+  const isFree = course!.priceCents === 0;
+  const price = isFree ? "Free" : formatPrice(course!.priceCents, course!.currency);
   const checkoutMessage = searchParams.checkout ? checkoutMessages[searchParams.checkout] : undefined;
 
   return (
@@ -75,11 +76,15 @@ export default async function CourseDetailPage({
                     className="focus-ring inline-flex items-center justify-center rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
                     type="submit"
                   >
-                    Enroll - {price}
+                    {isFree ? "Enroll for free" : `Enroll - ${price}`}
                   </button>
                 </form>
               )}
-              {!enrollment ? <span className="text-sm text-slate-300">One-time payment - lifetime access</span> : null}
+              {!enrollment ? (
+                <span className="text-sm text-slate-300">
+                  {isFree ? "No payment required" : "One-time payment - lifetime access"}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-glow">
