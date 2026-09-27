@@ -1,0 +1,38 @@
+import { promises as fs } from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+
+const uploadsDir = path.join(process.cwd(), ".data", "uploads");
+
+/**
+ * Local-disk file storage for assignment submissions. Works out of the box (no external
+ * dependency), but the files live on the app server's disk only - not backed up, and not
+ * shared if you ever run multiple instances. For real production use at scale, swap this
+ * for an S3-compatible bucket (Cloudflare R2, AWS S3) behind the same two functions.
+ */
+export async function saveUploadedFile(file: File, folder: string) {
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "upload";
+  const storedName = `${randomUUID()}-${safeName}`;
+  const relativePath = path.posix.join(folder, storedName);
+  const fullPath = path.join(uploadsDir, relativePath);
+
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+  await fs.writeFile(fullPath, bytes);
+
+  return {
+    url: `/api/uploads/${relativePath}`,
+    relativePath,
+    name: file.name,
+    sizeBytes: bytes.length
+  };
+}
+
+export async function readUploadedFile(relativePath: string) {
+  const fullPath = path.join(uploadsDir, relativePath);
+  const resolved = path.resolve(fullPath);
+  if (!resolved.startsWith(path.resolve(uploadsDir) + path.sep)) {
+    throw new Error("Invalid upload path");
+  }
+  return fs.readFile(resolved);
+}

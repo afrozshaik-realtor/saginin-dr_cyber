@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    typedRoutes: false
+    typedRoutes: false,
+    serverActions: {
+      bodySizeLimit: "15mb"
+    }
   }
 };
 

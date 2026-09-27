@@ -111,3 +111,54 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
   completed_at TIMESTAMPTZ,
   UNIQUE (student_id, lesson_id)
 );
+
+-- Modules/lessons (including quiz questions and assignment config) live in modules_json,
+-- matching the JSON-store shape in types/lms.ts (Course.modules). See the comment on the
+-- Course model in schema.prisma for why this isn't normalized into separate tables.
+CREATE TABLE IF NOT EXISTS courses (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  pathway_id TEXT,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL,
+  level TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  description TEXT NOT NULL,
+  certification TEXT,
+  image TEXT NOT NULL,
+  price_cents INTEGER NOT NULL,
+  currency TEXT NOT NULL,
+  published BOOLEAN NOT NULL DEFAULT TRUE,
+  modules_json JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  course_id TEXT NOT NULL,
+  lesson_id TEXT NOT NULL,
+  answers_json JSONB NOT NULL,
+  score_percent INTEGER NOT NULL,
+  correct_count INTEGER NOT NULL,
+  total_count INTEGER NOT NULL,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+  id TEXT PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  course_id TEXT NOT NULL,
+  lesson_id TEXT NOT NULL,
+  submission_type TEXT NOT NULL,
+  file_url TEXT,
+  file_name TEXT,
+  link TEXT,
+  text TEXT,
+  status TEXT NOT NULL DEFAULT 'submitted',
+  feedback TEXT,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  UNIQUE (student_id, lesson_id)
+);

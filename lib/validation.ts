@@ -48,6 +48,33 @@ export const grantAccessSchema = z.object({
   slug: z.string().min(1).max(80)
 });
 
+export const courseSchema = z.object({
+  title: z.string().min(1).max(160),
+  category: z.string().min(1).max(120),
+  level: z.enum(["Beginner", "Intermediate", "Advanced"]),
+  summary: z.string().min(1).max(400),
+  description: z.string().min(1).max(4000),
+  certification: z.string().max(200),
+  image: z.string().min(1).max(400),
+  priceCents: z.coerce.number().int().min(0),
+  currency: z.string().min(3).max(3),
+  published: z.boolean()
+});
+
+export const quizOptionSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1).max(400),
+  correct: z.boolean()
+});
+
+export const quizQuestionSchema = z.object({
+  id: z.string(),
+  prompt: z.string().min(1).max(600),
+  options: z.array(quizOptionSchema).min(2).max(8)
+});
+
+export const quizQuestionsSchema = z.array(quizQuestionSchema).min(1).max(50);
+
 export const leadPatchSchema = z.object({
   stage: z.string().optional(),
   status: z.string().optional(),

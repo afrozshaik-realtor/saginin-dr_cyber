@@ -1,13 +1,21 @@
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { checkoutAction } from "@/lib/actions/lms";
-import { getCourseBySlug, getLessonCount, getTotalDuration } from "@/lib/config/courses";
+import { getLessonCount, getTotalDuration } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
-import { getEnrollment } from "@/lib/store";
+import { getCourseBySlug, getEnrollment } from "@/lib/store";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const course = getCourseBySlug(params.slug);
+const kindLabels: Record<string, string> = {
+  text: "Reading",
+  video: "Video",
+  slides: "Slides",
+  quiz: "Quiz",
+  assignment: "Assignment"
+};
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  const course = await getCourseBySlug(params.slug);
   return { title: course ? `${course.title} | Dr Cyber` : "Course not found" };
 }
 
@@ -23,7 +31,7 @@ export default async function CourseDetailPage({
   params: { slug: string };
   searchParams: { checkout?: string };
 }) {
-  const course = getCourseBySlug(params.slug);
+  const course = await getCourseBySlug(params.slug);
   if (!course) notFound();
 
   const student = await getCurrentStudent();
@@ -93,7 +101,12 @@ export default async function CourseDetailPage({
                 {courseModule.lessons.map((lesson) => (
                   <li key={lesson.id} className="flex items-center justify-between px-5 py-3 text-sm">
                     <span>{lesson.title}</span>
-                    <span className="text-slate-500">{lesson.durationMinutes} min</span>
+                    <span className="flex items-center gap-2 text-slate-500">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        {kindLabels[lesson.kind] || lesson.kind}
+                      </span>
+                      {lesson.durationMinutes} min
+                    </span>
                   </li>
                 ))}
               </ul>

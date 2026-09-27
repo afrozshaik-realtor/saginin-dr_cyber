@@ -1,9 +1,8 @@
 import { AdminNav } from "@/components/AdminNav";
 import { grantAccessAction } from "@/lib/actions/admin";
-import { courses } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
-import { listStudentsWithStats } from "@/lib/store";
+import { listAllCoursesAdmin, listStudentsWithStats } from "@/lib/store";
 
 const grantMessages: Record<string, { text: string; tone: "success" | "error" }> = {
   success: { text: "Access granted - the student has been emailed a link to start the course.", tone: "success" },
@@ -16,7 +15,7 @@ export default async function AdminStudentsPage({
   searchParams: { grant?: string };
 }) {
   requireAdmin();
-  const students = await listStudentsWithStats();
+  const [students, courses] = await Promise.all([listStudentsWithStats(), listAllCoursesAdmin()]);
   const grantMessage = searchParams.grant ? grantMessages[searchParams.grant] : undefined;
 
   return (

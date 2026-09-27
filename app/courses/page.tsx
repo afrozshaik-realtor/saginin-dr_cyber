@@ -1,6 +1,6 @@
 import { CourseCard } from "@/components/CourseCard";
 import { SiteHeader } from "@/components/SiteHeader";
-import { courses } from "@/lib/config/courses";
+import { listCourses } from "@/lib/store";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function CoursesPage() {
-  const student = await getCurrentStudent();
+  const [student, courses] = await Promise.all([getCurrentStudent(), listCourses()]);
 
   return (
     <main className="min-h-screen bg-cloud">

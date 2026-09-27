@@ -10,7 +10,9 @@ export function AdminNav() {
         </Link>
         <div className="flex gap-4 text-sm font-semibold text-slate-600">
           <Link href="/admin/leads">Leads</Link>
+          <Link href="/admin/courses">Courses</Link>
           <Link href="/admin/students">Students</Link>
+          <Link href="/admin/submissions">Submissions</Link>
           <Link href="/admin/settings">Settings</Link>
         </div>
       </div>

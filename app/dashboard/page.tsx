@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
-import { courses, getLessonCount } from "@/lib/config/courses";
+import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
-import { getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
+import { getCourseById, getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
 
 export default async function DashboardPage() {
@@ -11,7 +11,7 @@ export default async function DashboardPage() {
 
   const enrolledCourses = await Promise.all(
     enrollments.map(async (enrollment) => {
-      const course = courses.find((item) => item.id === enrollment.courseId);
+      const course = await getCourseById(enrollment.courseId);
       if (!course) return null;
       const progressMap = await getLessonProgressMap(student.id, course.id);
       const totalLessons = getLessonCount(course);

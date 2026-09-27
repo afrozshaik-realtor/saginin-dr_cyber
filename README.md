@@ -10,8 +10,26 @@ Marketing automation MVP for a cybersecurity career-switch funnel. It includes a
 - `/dashboard` - a logged-in student's enrolled courses with a progress bar and what was paid per course.
 - `/learn/[slug]` - the lesson player: a sidebar with every module/lesson, lesson content, and a "Mark lesson complete" action that updates progress instantly.
 - `/admin/students` - admin view of every student, their enrollments, and total paid.
+- `/admin/courses` - full course editor: create/edit courses, and add, reorder, edit, or delete modules and lessons of any kind.
+- `/admin/submissions` - review assignment submissions and leave feedback.
 
-Course/module/lesson content is defined in code at `lib/config/courses.ts` (derived from the pathway roadmaps in `lib/config/pathways.ts`, with a price per course based on level), while students, enrollments, and lesson progress are stored as data (JSON store locally, or the `students` / `enrollments` / `lesson_progress` tables in Postgres).
+Courses, modules, and lessons are stored as data (JSON store locally, or the `courses` table - as a JSON column - in Postgres), managed entirely from `/admin/courses`. The catalog is seeded once, the first time the store is read, from the pathway roadmaps in `lib/config/pathways.ts` (via `lib/config/courses.ts`) - after that, `lib/config/courses.ts` is no longer the source of truth; edit content in the admin UI instead.
+
+### Lesson kinds
+
+Each lesson is one of five kinds, picked when you add it in `/admin/courses`:
+
+- **Text** - a reading, rendered as formatted text.
+- **Video** - paste a YouTube, Vimeo, or Loom URL; it's converted to an embeddable player automatically (`lib/embeds.ts`).
+- **Slides** - an embeddable URL (a Google Slides "Publish to web" embed link, or a PDF URL) shown in an iframe.
+- **Quiz** - multiple-choice questions built in the admin UI (`components/QuizBuilder.tsx`); students submit answers, get auto-graded instantly, and can retake it (every attempt is kept, `/admin` doesn't currently expose quiz history but it's in the store).
+- **Assignment** - written instructions plus a submission type: a link, a text response, or a file upload. Submitting marks the lesson complete immediately; `/admin/submissions` is where you review it and leave feedback afterward.
+
+Text/video/slides lessons keep the manual "Mark lesson complete" button; quiz and assignment lessons complete automatically on submission.
+
+### File uploads
+
+Assignment file submissions are saved to local disk (`.data/uploads/`, via `lib/services/storage.ts`) and served through an authenticated route (`GET /api/uploads/[...path]`) that only the submitting student or an admin can download from. This works out of the box with no extra setup, but the files live on the app server's disk only - not backed up, and lost if the server's disk is wiped (e.g. some platforms reset ephemeral storage on redeploy; verify yours doesn't before relying on this for real submissions). For real production use, swap `lib/services/storage.ts` for an S3-compatible bucket (Cloudflare R2, AWS S3) behind the same two functions.
 
 ### Payments (Stripe)
 
