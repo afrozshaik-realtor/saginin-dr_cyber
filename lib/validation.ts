@@ -42,6 +42,15 @@ export const studentLoginSchema = z.object({
   password: z.string().min(1).max(100)
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email().max(160)
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8).max(100)
+});
+
 export const grantAccessSchema = z.object({
   email: z.string().email().max(160),
   name: z.string().max(120).optional().or(z.literal("")),

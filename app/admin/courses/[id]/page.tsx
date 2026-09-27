@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminNav } from "@/components/AdminNav";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { CoursePriceFields } from "@/components/CoursePriceFields";
 import {
   addModuleAction,
   deleteCourseAction,
@@ -99,23 +100,7 @@ export default async function AdminCourseDetailPage({
             Cover image path
             <input className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" name="image" defaultValue={course!.image} required />
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm font-semibold">
-              Price (cents)
-              <input
-                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
-                name="priceCents"
-                type="number"
-                min={0}
-                defaultValue={course!.priceCents}
-                required
-              />
-            </label>
-            <label className="block text-sm font-semibold">
-              Currency
-              <input className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" name="currency" defaultValue={course!.currency} required />
-            </label>
-          </div>
+          <CoursePriceFields defaultPriceCents={course!.priceCents} defaultCurrency={course!.currency} />
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" name="published" defaultChecked={course!.published} />
             Published (visible in the public catalog)

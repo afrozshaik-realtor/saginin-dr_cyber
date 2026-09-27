@@ -96,3 +96,30 @@ export function verifyAccessToken(token: string): { studentId: string; courseSlu
     return null;
   }
 }
+
+const RESET_TOKEN_TTL_MS = 1000 * 60 * 60;
+
+export function createPasswordResetToken(studentId: string) {
+  const payload = JSON.stringify({ s: studentId, purpose: "reset", e: Date.now() + RESET_TOKEN_TTL_MS });
+  const encoded = Buffer.from(payload).toString("base64url");
+  return `${encoded}.${signAccessPayload(encoded)}`;
+}
+
+export function verifyPasswordResetToken(token: string): { studentId: string } | null {
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+
+  const expected = signAccessPayload(encoded);
+  const provided = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (provided.length !== expectedBuffer.length || !timingSafeEqual(provided, expectedBuffer)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString());
+    if (payload.purpose !== "reset" || typeof payload.s !== "string" || typeof payload.e !== "number") return null;
+    if (Date.now() > payload.e) return null;
+    return { studentId: payload.s };
+  } catch {
+    return null;
+  }
+}

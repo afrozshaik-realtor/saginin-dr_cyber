@@ -20,11 +20,13 @@ export default async function DashboardPage() {
       const paidLabel =
         enrollment.paymentStatus === "paid" && enrollment.amountPaidCents
           ? `Purchased for ${formatPrice(enrollment.amountPaidCents, enrollment.currency || course.currency)}`
-          : enrollment.paymentStatus === "granted"
-            ? "Access granted by admin"
-            : enrollment.paymentStatus === "dev-mode"
-              ? "Enrolled (dev mode, no payment)"
-              : null;
+          : enrollment.paymentStatus === "free"
+            ? "Free course"
+            : enrollment.paymentStatus === "granted"
+              ? "Access granted by admin"
+              : enrollment.paymentStatus === "dev-mode"
+                ? "Enrolled (dev mode, no payment)"
+                : null;
       return { course, completedLessons, totalLessons, percent, paidLabel };
     })
   );

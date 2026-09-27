@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ButtonLink } from "@/components/ButtonLink";
 import { pathways } from "@/lib/config/pathways";
 
@@ -44,6 +45,14 @@ export default function LandingPage({
           aria-hidden="true"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/85 to-navy/40" />
+        <div className="absolute right-6 top-6 z-10 lg:right-8 lg:top-8">
+          <Link
+            className="focus-ring inline-flex items-center justify-center rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+            href="/login"
+          >
+            Members
+          </Link>
+        </div>
         <div className="relative mx-auto grid min-h-[92vh] max-w-7xl gap-10 px-6 py-10 md:grid-cols-[1.05fr_.95fr] md:items-center lg:px-8">
           <div className="max-w-3xl">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-mint">Free career roadmap quiz</p>

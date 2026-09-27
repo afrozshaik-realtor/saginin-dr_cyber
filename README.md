@@ -6,7 +6,7 @@ Marketing automation MVP for a cybersecurity career-switch funnel. It includes a
 
 - `/courses` - public course catalog. Each of the 8 career pathways is available as a paid, self-paced course with modules, lessons, and portfolio projects.
 - `/courses/[slug]` - course landing page with the full curriculum outline and an "Enroll - $price" call to action that starts Stripe Checkout.
-- `/signup` and `/login` - student accounts, separate from the admin login, stored with a bcrypt password hash and a signed session cookie.
+- `/signup` and `/login` - student accounts, separate from the admin login, stored with a bcrypt password hash and a signed session cookie. `/forgot-password` and `/reset-password` handle self-service password resets via a signed, 1-hour email link (`createPasswordResetToken`/`verifyPasswordResetToken` in `lib/studentAuth.ts`); the request form always shows the same confirmation regardless of whether the email is registered, so it can't be used to check who has an account.
 - `/dashboard` - a logged-in student's enrolled courses with a progress bar and what was paid per course.
 - `/learn/[slug]` - the lesson player: a sidebar with every module/lesson, lesson content, and a "Mark lesson complete" action that updates progress instantly.
 - `/admin/students` - admin view of every student, their enrollments, and total paid.
@@ -45,7 +45,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - Point a Stripe webhook at `POST /api/webhooks/stripe` listening for `checkout.session.completed`; it verifies the signature and enrolls the student once payment is confirmed.
 - `/checkout/success` also verifies the Checkout Session directly as a fallback (useful locally where the Stripe CLI isn't forwarding webhooks) and enrolls the student if it hasn't happened yet. Enrollment is idempotent either way.
 - If `STRIPE_SECRET_KEY` is not set, "Enroll" falls back to enrolling the student directly (marked `dev-mode`, no payment) so the app stays testable without live Stripe keys - unset this before deploying somewhere real users can reach it.
-- Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`); change them there.
+- Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`) for the seeded catalog; change a course's price any time from `/admin/courses/[id]`.
+- **Free courses**: check "This course is free" when creating/editing a course in `/admin/courses` (locks the price to 0). Enrolling in a $0 course skips Stripe entirely and enrolls the student directly (marked `free`) - Stripe Checkout doesn't support $0 line items, so this isn't just a UI nicety, it avoids a real checkout failure.
 
 ### Admin-granted access (no payment)
 
