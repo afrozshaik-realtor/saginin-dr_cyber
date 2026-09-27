@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { findLesson } from "@/lib/config/courses";
+import { sendPasswordResetEmail } from "@/lib/services/email";
 import { createCheckoutSession } from "@/lib/services/stripe";
 import { saveUploadedFile } from "@/lib/services/storage";
 import {
@@ -14,17 +15,20 @@ import {
   getStudentByEmail,
   getStudentById,
   recordQuizAttempt,
-  setLessonProgress
+  setLessonProgress,
+  updateStudentPassword
 } from "@/lib/store";
 import {
   clearStudentSession,
+  createPasswordResetToken,
   getStudentSessionId,
   hashPassword,
   requireStudent,
   setStudentSession,
-  verifyPassword
+  verifyPassword,
+  verifyPasswordResetToken
 } from "@/lib/studentAuth";
-import { studentLoginSchema, studentSignupSchema } from "@/lib/validation";
+import { forgotPasswordSchema, resetPasswordSchema, studentLoginSchema, studentSignupSchema } from "@/lib/validation";
 
 function safeRedirect(target: FormDataEntryValue | null) {
   const value = typeof target === "string" ? target : "";
@@ -80,6 +84,40 @@ export async function loginAction(formData: FormData) {
 export async function logoutAction() {
   clearStudentSession();
   redirect("/");
+}
+
+export async function forgotPasswordAction(formData: FormData) {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) redirect("/forgot-password?sent=1");
+
+  const student = await getStudentByEmail(parsed.data.email);
+  if (student) {
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const token = createPasswordResetToken(student.id);
+    await sendPasswordResetEmail(student, `${appUrl}/reset-password?token=${token}`);
+  }
+  // Always show the same confirmation, whether or not the email is registered, so this can't be used to check who has an account.
+  redirect("/forgot-password?sent=1");
+}
+
+export async function resetPasswordAction(formData: FormData) {
+  const token = String(formData.get("token") || "");
+  const confirmPassword = String(formData.get("confirmPassword") || "");
+  const parsed = resetPasswordSchema.safeParse({
+    token,
+    password: formData.get("password")
+  });
+  if (!parsed.success || parsed.data.password !== confirmPassword) {
+    redirect(`/reset-password?token=${encodeURIComponent(token)}&error=invalid`);
+  }
+
+  const payload = verifyPasswordResetToken(parsed.data.token);
+  if (!payload) redirect("/forgot-password?error=expired");
+
+  const passwordHash = await hashPassword(parsed.data.password);
+  await updateStudentPassword(payload!.studentId, passwordHash);
+  setStudentSession(payload!.studentId);
+  redirect("/dashboard?reset=success");
 }
 
 export async function checkoutAction(formData: FormData) {

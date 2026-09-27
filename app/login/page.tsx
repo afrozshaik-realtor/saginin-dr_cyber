@@ -22,7 +22,16 @@ export default function LoginPage({
           Password
           <input className="mt-2 w-full rounded-md border border-slate-300 px-3 py-3" name="password" type="password" required />
         </label>
-        {searchParams.error ? (
+        <p className="mt-2 text-right text-sm">
+          <Link className="font-semibold text-blueglow" href="/forgot-password">
+            Forgot password?
+          </Link>
+        </p>
+        {searchParams.error === "expired" ? (
+          <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
+            That link has expired. Log in below, or use &quot;Forgot password?&quot; if needed.
+          </p>
+        ) : searchParams.error ? (
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Invalid email or password.</p>
         ) : null}
         <button className="mt-6 w-full rounded-md bg-cyan px-5 py-3 font-bold text-navy hover:bg-mint" type="submit">

@@ -284,6 +284,15 @@ export async function getStudentById(id: string) {
   return store.students.find((student) => student.id === id) || null;
 }
 
+export async function updateStudentPassword(id: string, passwordHash: string) {
+  const store = await readStore();
+  const student = store.students.find((item) => item.id === id);
+  if (!student) return null;
+  student.passwordHash = passwordHash;
+  await writeStore(store);
+  return student;
+}
+
 export async function enrollStudent(
   studentId: string,
   courseId: string,

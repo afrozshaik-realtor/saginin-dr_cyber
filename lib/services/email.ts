@@ -184,3 +184,44 @@ export async function sendCourseAccessEmail(student: Student, course: Course, ac
   await trackEvent("Course Access Email Sent", { studentId: student.id, courseId: course.id, status });
   return status;
 }
+
+export function renderPasswordResetEmail(student: Student, resetLink: string) {
+  const subject = "Reset your password";
+  const text = `Hi ${student.name},
+
+We received a request to reset your password.
+
+Reset it here (this link expires in 1 hour):
+${resetLink}
+
+If you did not request this, you can safely ignore this email - your password will not change.
+
+Regards,
+${appSettings().senderName}`;
+
+  const html = renderBrandedEmail({
+    preheader: subject,
+    bodyHtml: `
+      <h1 style="margin:0 0 12px;font-size:20px;">Reset your password</h1>
+      <p style="margin:0 0 20px;line-height:1.6;">Hi ${escapeHtml(student.name)}, we received a request to reset your password. This link expires in 1 hour.</p>
+      <p style="margin:0 0 24px;">
+        <a href="${escapeHtml(resetLink)}" style="display:inline-block;background:#23a6f0;color:#071421;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Reset password</a>
+      </p>
+      <p style="margin:0;font-size:13px;color:#64748b;">If you did not request this, you can safely ignore this email - your password will not change. If the button does not work, copy and paste this link: ${escapeHtml(resetLink)}</p>
+    `
+  });
+
+  return { subject, text, html };
+}
+
+export async function sendPasswordResetEmail(student: Student, resetLink: string) {
+  const email = renderPasswordResetEmail(student, resetLink);
+  const status = await sendProviderEmail({
+    to: student.email,
+    subject: email.subject,
+    text: email.text,
+    html: email.html
+  });
+  await trackEvent("Password Reset Email Sent", { studentId: student.id, status });
+  return status;
+}
