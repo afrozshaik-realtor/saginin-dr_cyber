@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { QuizBuilder } from "@/components/QuizBuilder";
+import { ResourcesEditor } from "@/components/ResourcesEditor";
 import type { Lesson, LessonKind } from "@/types/lms";
 
 const kindOptions: { value: LessonKind; label: string }[] = [
@@ -29,7 +30,11 @@ export function LessonForm({
   const isEditing = Boolean(lessonId);
 
   return (
-    <form action={action} className="space-y-4 rounded-lg border border-slate-200 bg-white p-6">
+    <form
+      action={action}
+      encType="multipart/form-data"
+      className="space-y-4 rounded-lg border border-slate-200 bg-white p-6"
+    >
       <input type="hidden" name="courseId" value={courseId} />
       <input type="hidden" name="moduleId" value={moduleId} />
       {lessonId ? <input type="hidden" name="lessonId" value={lessonId} /> : null}
@@ -183,6 +188,8 @@ export function LessonForm({
           </label>
         </>
       ) : null}
+
+      <ResourcesEditor initialResources={initialLesson?.resources ?? []} />
 
       <button className="rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint" type="submit">
         {isEditing ? "Save lesson" : "Add lesson"}

@@ -27,6 +27,10 @@ Each lesson is one of five kinds, picked when you add it in `/admin/courses`:
 
 Text/video/slides lessons keep the manual "Mark lesson complete" button; quiz and assignment lessons complete automatically on submission.
 
+### Lesson resources
+
+Any lesson, regardless of kind, can also have any number of extra **resources** attached (`components/ResourcesEditor.tsx`) - supplementary videos, links, or file uploads shown in a "Resources" list under the lesson content. Each resource is a label plus either a URL (link/video) or an uploaded file. Resource files are saved the same way assignment submissions are (`.data/uploads/lesson-resources/<courseId>/...`) and served through the same authenticated `GET /api/uploads/[...path]` route - any student enrolled in the course can download them, not just the one who submitted something.
+
 ### File uploads
 
 Assignment file submissions are saved to local disk (`.data/uploads/`, via `lib/services/storage.ts`) and served through an authenticated route (`GET /api/uploads/[...path]`) that only the submitting student or an admin can download from. This works out of the box with no extra setup, but the files live on the app server's disk only - not backed up, and lost if the server's disk is wiped (e.g. some platforms reset ephemeral storage on redeploy; verify yours doesn't before relying on this for real submissions - this is separate from the database, which now persists course/student/enrollment data independently of redeploys). For real production use, swap `lib/services/storage.ts` for an S3-compatible bucket (Cloudflare R2, AWS S3) behind the same two functions.
