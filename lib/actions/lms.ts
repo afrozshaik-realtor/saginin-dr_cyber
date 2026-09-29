@@ -8,7 +8,6 @@ import { createCheckoutSession } from "@/lib/services/stripe";
 import { saveUploadedFile } from "@/lib/services/storage";
 import {
   createAssignmentSubmission,
-  createStudent,
   enrollStudent,
   getCourseBySlug,
   getEnrollment,
@@ -28,37 +27,11 @@ import {
   verifyPassword,
   verifyPasswordResetToken
 } from "@/lib/studentAuth";
-import { forgotPasswordSchema, resetPasswordSchema, studentLoginSchema, studentSignupSchema } from "@/lib/validation";
+import { forgotPasswordSchema, resetPasswordSchema, studentLoginSchema } from "@/lib/validation";
 
 function safeRedirect(target: FormDataEntryValue | null) {
   const value = typeof target === "string" ? target : "";
-  return value.startsWith("/") ? value : "/dashboard";
-}
-
-export async function signupAction(formData: FormData) {
-  const redirectTo = safeRedirect(formData.get("redirect"));
-  const parsed = studentSignupSchema.safeParse({
-    name: formData.get("name"),
-    email: formData.get("email"),
-    password: formData.get("password")
-  });
-  if (!parsed.success) {
-    redirect(`/signup?error=invalid&redirect=${encodeURIComponent(redirectTo)}`);
-  }
-
-  const existing = await getStudentByEmail(parsed.data.email);
-  if (existing) {
-    redirect(`/signup?error=exists&redirect=${encodeURIComponent(redirectTo)}`);
-  }
-
-  const passwordHash = await hashPassword(parsed.data.password);
-  const student = await createStudent({ name: parsed.data.name, email: parsed.data.email, passwordHash });
-  if (!student) {
-    redirect(`/signup?error=exists&redirect=${encodeURIComponent(redirectTo)}`);
-  }
-
-  setStudentSession(student!.id);
-  redirect(redirectTo);
+  return value.startsWith("/") ? value : "/courses";
 }
 
 export async function loginAction(formData: FormData) {

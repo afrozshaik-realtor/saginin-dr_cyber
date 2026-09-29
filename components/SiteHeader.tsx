@@ -23,15 +23,7 @@ export function SiteHeader({ student }: { student: Student | null }) {
               </form>
             </>
           ) : (
-            <>
-              <Link href="/login">Log in</Link>
-              <Link
-                className="rounded-md bg-ink px-4 py-2 text-white hover:bg-navy"
-                href="/signup"
-              >
-                Sign up
-              </Link>
-            </>
+            <Link href="/login">Log in</Link>
           )}
         </nav>
       </div>
