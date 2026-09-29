@@ -213,7 +213,11 @@ async function parseResourcesFromFormData(formData: FormData, courseId: string):
   return resources;
 }
 
-async function parseLessonFromFormData(formData: FormData, courseId: string): Promise<Omit<Lesson, "id"> | null> {
+async function parseLessonFromFormData(
+  formData: FormData,
+  courseId: string,
+  existingLesson?: Lesson | null
+): Promise<Omit<Lesson, "id"> | null> {
   const kind = String(formData.get("kind") || "") as Lesson["kind"];
   const title = String(formData.get("title") || "").trim();
   const durationMinutes = Math.max(1, Number(formData.get("durationMinutes")) || 15);
@@ -253,7 +257,20 @@ async function parseLessonFromFormData(formData: FormData, courseId: string): Pr
     const instructions = String(formData.get("instructions") || "").trim();
     if (!instructions) return null;
     const submissionType = String(formData.get("submissionType") || "link") as AssignmentSubmissionType;
-    const lesson: Omit<AssignmentLesson, "id"> = { ...base, kind, instructions, submissionType };
+
+    let templatePdfUrl: string | undefined;
+    if (submissionType === "pdf-form") {
+      const file = formData.get("templatePdfFile");
+      if (file instanceof File && file.size > 0) {
+        const uploaded = await saveUploadedFile(file, `assignment-templates/${courseId}`);
+        templatePdfUrl = uploaded.url;
+      } else if (existingLesson?.kind === "assignment") {
+        templatePdfUrl = existingLesson.templatePdfUrl;
+      }
+      if (!templatePdfUrl) return null;
+    }
+
+    const lesson: Omit<AssignmentLesson, "id"> = { ...base, kind, instructions, submissionType, templatePdfUrl };
     return lesson;
   }
   return null;
@@ -275,7 +292,12 @@ export async function updateLessonAction(formData: FormData) {
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lessonId = String(formData.get("lessonId") || "");
-  const lesson = await parseLessonFromFormData(formData, courseId);
+
+  const course = await getCourseById(courseId);
+  const existingLesson =
+    course?.modules.find((item) => item.id === moduleId)?.lessons.find((item) => item.id === lessonId) || null;
+
+  const lesson = await parseLessonFromFormData(formData, courseId, existingLesson);
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await updateLesson(courseId, moduleId, lessonId, lesson!);

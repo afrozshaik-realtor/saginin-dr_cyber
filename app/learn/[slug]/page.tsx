@@ -1,10 +1,13 @@
 import { clsx } from "clsx";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { PdfFormFiller } from "@/components/PdfFormFiller";
 import { SiteHeader } from "@/components/SiteHeader";
 import { submitAssignmentAction, submitQuizAction, toggleLessonAction } from "@/lib/actions/lms";
 import { findLesson, listLessonsFlat } from "@/lib/config/courses";
 import { toVideoEmbedUrl } from "@/lib/embeds";
+import { extractFormFields, type PdfFormMeta } from "@/lib/services/pdfForm";
+import { readUploadedFile } from "@/lib/services/storage";
 import {
   getAssignmentSubmission,
   getCourseBySlug,
@@ -52,6 +55,16 @@ export default async function LearnPage({
     activeLesson?.kind === "quiz" ? await getLatestQuizAttempt(student.id, activeLesson.id) : null;
   const assignmentSubmission =
     activeLesson?.kind === "assignment" ? await getAssignmentSubmission(student.id, activeLesson.id) : null;
+  let pdfFormMeta: PdfFormMeta | null = null;
+  if (activeLesson?.kind === "assignment" && activeLesson.submissionType === "pdf-form" && activeLesson.templatePdfUrl) {
+    try {
+      const relativePath = activeLesson.templatePdfUrl.replace(/^\/api\/uploads\//, "");
+      const bytes = await readUploadedFile(relativePath);
+      pdfFormMeta = await extractFormFields(new Uint8Array(bytes));
+    } catch {
+      pdfFormMeta = null;
+    }
+  }
 
   return (
     <main className="min-h-screen bg-cloud">
@@ -198,7 +211,9 @@ export default async function LearnPage({
                       ) : null}
                       {assignmentSubmission.fileUrl ? (
                         <a className="mt-1 block text-sm text-blueglow" href={assignmentSubmission.fileUrl}>
-                          {assignmentSubmission.fileName || "Download submission"}
+                          {activeLesson.submissionType === "pdf-form"
+                            ? "Download your completed PDF"
+                            : assignmentSubmission.fileName || "Download submission"}
                         </a>
                       ) : null}
                       {assignmentSubmission.text ? (
@@ -216,6 +231,12 @@ export default async function LearnPage({
                   {searchParams.error === "missing" ? (
                     <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
                       Please provide a submission before continuing.
+                    </p>
+                  ) : null}
+
+                  {activeLesson.submissionType === "pdf-form" && !pdfFormMeta ? (
+                    <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+                      This assignment&apos;s PDF form could not be loaded. Please let your instructor know.
                     </p>
                   ) : null}
 
@@ -249,12 +270,21 @@ export default async function LearnPage({
                     {activeLesson.submissionType === "file" ? (
                       <input className="w-full rounded-md border border-slate-300 px-3 py-2" name="file" type="file" required />
                     ) : null}
-                    <button
-                      className="rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
-                      type="submit"
-                    >
-                      {assignmentSubmission ? "Resubmit" : "Submit assignment"}
-                    </button>
+                    {activeLesson.submissionType === "pdf-form" && pdfFormMeta ? (
+                      <PdfFormFiller
+                        templateUrl={activeLesson.templatePdfUrl!}
+                        formMeta={pdfFormMeta}
+                        initialAnswers={assignmentSubmission?.answers}
+                      />
+                    ) : null}
+                    {activeLesson.submissionType !== "pdf-form" || pdfFormMeta ? (
+                      <button
+                        className="rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
+                        type="submit"
+                      >
+                        {assignmentSubmission ? "Resubmit" : "Submit assignment"}
+                      </button>
+                    ) : null}
                   </form>
                 </div>
               ) : null}

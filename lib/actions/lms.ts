@@ -3,9 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { findLesson } from "@/lib/config/courses";
-import { sendPasswordResetEmail } from "@/lib/services/email";
+import { sendAssignmentSubmissionEmails, sendPasswordResetEmail } from "@/lib/services/email";
+import { fillFormPdf } from "@/lib/services/pdfForm";
 import { createCheckoutSession } from "@/lib/services/stripe";
-import { saveUploadedFile } from "@/lib/services/storage";
+import { readUploadedFile, saveGeneratedFile, saveUploadedFile } from "@/lib/services/storage";
 import {
   createAssignmentSubmission,
   enrollStudent,
@@ -219,7 +220,7 @@ export async function submitAssignmentAction(formData: FormData) {
   } else if (lesson!.submissionType === "text") {
     submission.text = String(formData.get("text") || "").trim();
     if (!submission.text) redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
-  } else {
+  } else if (lesson!.submissionType === "file") {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) {
       redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
@@ -227,10 +228,37 @@ export async function submitAssignmentAction(formData: FormData) {
     const uploaded = await saveUploadedFile(file as File, `assignments/${student.id}/${lessonId}`);
     submission.fileUrl = uploaded.url;
     submission.fileName = (file as File).name;
+  } else if (lesson!.submissionType === "pdf-form") {
+    if (!lesson!.templatePdfUrl) redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
+    let answers: Record<string, string | boolean>;
+    try {
+      answers = JSON.parse(String(formData.get("answersJson") || "{}"));
+    } catch {
+      answers = {};
+    }
+    if (!Object.keys(answers).length) redirect(`/learn/${slug}?lesson=${lessonId}&error=missing`);
+
+    const relativeTemplatePath = lesson!.templatePdfUrl!.replace(/^\/api\/uploads\//, "");
+    const templateBytes = await readUploadedFile(relativeTemplatePath);
+    const filledBytes = await fillFormPdf(new Uint8Array(templateBytes), answers);
+    const saved = await saveGeneratedFile(
+      Buffer.from(filledBytes),
+      `${lesson!.title || "assignment"}.pdf`,
+      `assignments/${student.id}/${lessonId}`
+    );
+    submission.fileUrl = saved.url;
+    submission.fileName = saved.name;
+    submission.answers = answers;
   }
 
   await createAssignmentSubmission(submission);
   await setLessonProgress(student.id, course!.id, lessonId, true);
+
+  if (lesson!.submissionType === "pdf-form" && submission.fileUrl) {
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    await sendAssignmentSubmissionEmails(student, course!, lesson!.title, `${appUrl}${submission.fileUrl}`);
+  }
+
   revalidatePath(`/learn/${slug}`);
   revalidatePath("/dashboard");
   redirect(`/learn/${slug}?lesson=${lessonId}`);

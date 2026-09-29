@@ -12,7 +12,7 @@ export type QuizQuestion = {
   options: QuizOption[];
 };
 
-export type AssignmentSubmissionType = "file" | "link" | "text";
+export type AssignmentSubmissionType = "file" | "link" | "text" | "pdf-form";
 
 export type LessonResourceKind = "link" | "video" | "file";
 
@@ -57,6 +57,8 @@ export type AssignmentLesson = LessonBase & {
   kind: "assignment";
   instructions: string;
   submissionType: AssignmentSubmissionType;
+  // Only used when submissionType is "pdf-form" - the blank, fillable PDF the student fills in.
+  templatePdfUrl?: string;
 };
 
 export type Lesson = TextLesson | VideoLesson | SlidesLesson | QuizLesson | AssignmentLesson;
@@ -155,6 +157,8 @@ export type AssignmentSubmission = {
   fileName?: string;
   link?: string;
   text?: string;
+  // Only used when submissionType is "pdf-form" - the field name -> answer map that filled the PDF.
+  answers?: Record<string, string | boolean>;
   status: AssignmentSubmissionStatus;
   feedback?: string;
   submittedAt: string;

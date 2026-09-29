@@ -32,7 +32,10 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     return serveFile(relativePath, submission.fileName || "download");
   }
 
-  if (relativePath.startsWith("lesson-resources/")) {
+  // Lesson resources and assignment PDF templates are both stored under
+  // "<kind>/<courseId>/..." and share the same access rule: an admin can always download,
+  // and a student can if they're enrolled in that course.
+  if (relativePath.startsWith("lesson-resources/") || relativePath.startsWith("assignment-templates/")) {
     if (isAdmin) return serveFile(relativePath, fileName);
     const courseId = relativePath.split("/")[1];
     const enrollment = studentId && courseId ? await getEnrollment(studentId, courseId) : null;
