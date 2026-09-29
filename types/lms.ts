@@ -14,11 +14,21 @@ export type QuizQuestion = {
 
 export type AssignmentSubmissionType = "file" | "link" | "text";
 
+export type LessonResourceKind = "link" | "video" | "file";
+
+export type LessonResource = {
+  id: string;
+  label: string;
+  kind: LessonResourceKind;
+  url: string;
+};
+
 type LessonBase = {
   id: string;
   title: string;
   durationMinutes: number;
   summary: string;
+  resources?: LessonResource[];
 };
 
 export type TextLesson = LessonBase & {

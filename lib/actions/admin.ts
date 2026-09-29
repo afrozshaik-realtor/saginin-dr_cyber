@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { sendCourseAccessEmail } from "@/lib/services/email";
+import { saveUploadedFile } from "@/lib/services/storage";
 import {
   addLesson,
   addModule,
@@ -24,11 +25,12 @@ import {
   updateModule
 } from "@/lib/store";
 import { createAccessToken, hashPassword } from "@/lib/studentAuth";
-import { courseSchema, grantAccessSchema, quizQuestionsSchema } from "@/lib/validation";
+import { courseSchema, grantAccessSchema, lessonResourcesSchema, quizQuestionsSchema } from "@/lib/validation";
 import type {
   AssignmentLesson,
   AssignmentSubmissionType,
   Lesson,
+  LessonResource,
   QuizLesson,
   SlidesLesson,
   TextLesson,
@@ -180,13 +182,45 @@ export async function moveLessonAction(formData: FormData) {
   redirect(`/admin/courses/${courseId}`);
 }
 
-function parseLessonFromFormData(formData: FormData): Omit<Lesson, "id"> | null {
+async function parseResourcesFromFormData(formData: FormData, courseId: string): Promise<LessonResource[]> {
+  const raw = String(formData.get("resourcesJson") || "[]");
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const parsed = lessonResourcesSchema.safeParse(parsedJson);
+  if (!parsed.success) return [];
+
+  const resources: LessonResource[] = [];
+  for (const entry of parsed.data) {
+    const label = entry.label.trim();
+    if (!label) continue;
+
+    let url = (entry.url || "").trim();
+    if (entry.kind === "file") {
+      const file = formData.get(`resourceFile-${entry.id}`);
+      if (file instanceof File && file.size > 0) {
+        const uploaded = await saveUploadedFile(file, `lesson-resources/${courseId}`);
+        url = uploaded.url;
+      }
+    }
+    if (!url) continue;
+
+    resources.push({ id: entry.id, label, kind: entry.kind, url });
+  }
+  return resources;
+}
+
+async function parseLessonFromFormData(formData: FormData, courseId: string): Promise<Omit<Lesson, "id"> | null> {
   const kind = String(formData.get("kind") || "") as Lesson["kind"];
   const title = String(formData.get("title") || "").trim();
   const durationMinutes = Math.max(1, Number(formData.get("durationMinutes")) || 15);
   const summary = String(formData.get("summary") || "").trim();
   if (!title) return null;
-  const base = { title, durationMinutes, summary };
+  const resources = await parseResourcesFromFormData(formData, courseId);
+  const base = { title, durationMinutes, summary, resources };
 
   if (kind === "text") {
     const content = String(formData.get("content") || "").trim();
@@ -229,7 +263,7 @@ export async function createLessonAction(formData: FormData) {
   requireAdmin();
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
-  const lesson = parseLessonFromFormData(formData);
+  const lesson = await parseLessonFromFormData(formData, courseId);
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await addLesson(courseId, moduleId, lesson!);
@@ -241,7 +275,7 @@ export async function updateLessonAction(formData: FormData) {
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lessonId = String(formData.get("lessonId") || "");
-  const lesson = parseLessonFromFormData(formData);
+  const lesson = await parseLessonFromFormData(formData, courseId);
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await updateLesson(courseId, moduleId, lessonId, lesson!);

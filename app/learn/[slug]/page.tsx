@@ -259,6 +259,26 @@ export default async function LearnPage({
                 </div>
               ) : null}
 
+              {activeLesson.resources && activeLesson.resources.length ? (
+                <div className="mt-6 rounded-md border border-slate-200 bg-cloud p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resources</p>
+                  <ul className="mt-2 space-y-1">
+                    {activeLesson.resources.map((resource) => (
+                      <li key={resource.id}>
+                        <a
+                          className="text-sm font-semibold text-blueglow hover:underline"
+                          href={resource.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {resource.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {activeLesson.kind === "text" || activeLesson.kind === "video" || activeLesson.kind === "slides" ? (
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <form action={toggleLessonAction}>

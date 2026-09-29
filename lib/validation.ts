@@ -84,6 +84,15 @@ export const quizQuestionSchema = z.object({
 
 export const quizQuestionsSchema = z.array(quizQuestionSchema).min(1).max(50);
 
+export const lessonResourceSchema = z.object({
+  id: z.string(),
+  label: z.string().max(160),
+  kind: z.enum(["link", "video", "file"]),
+  url: z.string().max(2000).optional().default("")
+});
+
+export const lessonResourcesSchema = z.array(lessonResourceSchema).max(20);
+
 export const leadPatchSchema = z.object({
   stage: z.string().optional(),
   status: z.string().optional(),
