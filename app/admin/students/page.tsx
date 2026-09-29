@@ -1,9 +1,10 @@
 import { AdminNav } from "@/components/AdminNav";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { grantAccessAction } from "@/lib/actions/admin";
+import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
-import { listAllCoursesAdmin, listStudentsWithStats } from "@/lib/store";
+import { listAllCoursesAdmin, listCompletedLessonCounts, listStudentsWithStats } from "@/lib/store";
 import { createAccessToken } from "@/lib/studentAuth";
 
 function grantMessage(grant: string | undefined, mailed: string | undefined) {
@@ -28,7 +29,11 @@ export default async function AdminStudentsPage({
   searchParams: { grant?: string; mailed?: string };
 }) {
   requireAdmin();
-  const [students, courses] = await Promise.all([listStudentsWithStats(), listAllCoursesAdmin()]);
+  const [students, courses, completedCounts] = await Promise.all([
+    listStudentsWithStats(),
+    listAllCoursesAdmin(),
+    listCompletedLessonCounts()
+  ]);
   const message = grantMessage(searchParams.grant, searchParams.mailed);
   const appUrl = process.env.APP_URL || "http://localhost:3000";
 
@@ -100,10 +105,26 @@ export default async function AdminStudentsPage({
                   <td className="p-3 font-semibold">{student.name}</td>
                   <td className="p-3">{student.email}</td>
                   <td className="p-3">
-                    {student.enrollments
-                      .map((enrollment) => courses.find((course) => course.id === enrollment.courseId)?.title)
-                      .filter(Boolean)
-                      .join(", ") || "None"}
+                    <div className="flex flex-col gap-1">
+                      {student.enrollments.length
+                        ? student.enrollments.map((enrollment) => {
+                            const course = courses.find((item) => item.id === enrollment.courseId);
+                            if (!course) return null;
+                            const totalLessons = getLessonCount(course);
+                            const completed = completedCounts[`${student.id}:${course.id}`] || 0;
+                            const isComplete = totalLessons > 0 && completed >= totalLessons;
+                            return (
+                              <div key={enrollment.id} className="flex items-center gap-1.5">
+                                <span>{course.title}</span>
+                                <span className={isComplete ? "font-semibold text-emerald-600" : "text-slate-500"}>
+                                  {isComplete ? "✓ " : ""}
+                                  {completed}/{totalLessons}
+                                </span>
+                              </div>
+                            );
+                          })
+                        : "None"}
+                    </div>
                   </td>
                   <td className="p-3">
                     <div className="flex flex-col gap-1">

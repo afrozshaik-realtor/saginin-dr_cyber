@@ -225,3 +225,75 @@ export async function sendPasswordResetEmail(student: Student, resetLink: string
   await trackEvent("Password Reset Email Sent", { studentId: student.id, status });
   return status;
 }
+
+function renderAssignmentSubmittedStudentEmail(
+  student: Student,
+  course: Course,
+  lessonTitle: string,
+  downloadUrl: string
+) {
+  const subject = `Your assignment submission for ${course.title}`;
+  const text = `Hi ${student.name},
+
+We received your submission for "${lessonTitle}" in ${course.title}.
+
+You can download your completed copy here:
+${downloadUrl}
+
+Regards,
+${appSettings().senderName}`;
+
+  const html = renderBrandedEmail({
+    preheader: subject,
+    bodyHtml: `
+      <h1 style="margin:0 0 12px;font-size:20px;">Assignment submitted</h1>
+      <p style="margin:0 0 20px;line-height:1.6;">Hi ${escapeHtml(student.name)}, we received your submission for "${escapeHtml(lessonTitle)}" in ${escapeHtml(course.title)}.</p>
+      <p style="margin:0 0 24px;">
+        <a href="${escapeHtml(downloadUrl)}" style="display:inline-block;background:#23a6f0;color:#071421;font-weight:bold;padding:12px 24px;border-radius:6px;text-decoration:none;">Download your submission</a>
+      </p>
+    `
+  });
+
+  return { subject, text, html };
+}
+
+/**
+ * Notifies both the student (confirmation, with a download link) and the admin (heads-up) that a
+ * completed assignment was submitted. Used for the fillable-PDF assignment flow.
+ */
+export async function sendAssignmentSubmissionEmails(
+  student: Student,
+  course: Course,
+  lessonTitle: string,
+  downloadUrl: string
+) {
+  const studentEmail = renderAssignmentSubmittedStudentEmail(student, course, lessonTitle, downloadUrl);
+  const studentStatus = await sendProviderEmail({
+    to: student.email,
+    subject: studentEmail.subject,
+    text: studentEmail.text,
+    html: studentEmail.html
+  });
+
+  const settings = appSettings();
+  let adminStatus: string | undefined;
+  if (settings.adminNotificationEmail) {
+    const subject = `Assignment submitted: ${student.name} - ${lessonTitle}`;
+    const text = `${student.name} (${student.email}) submitted "${lessonTitle}" in ${course.title}.\n\nDownload: ${downloadUrl}`;
+    adminStatus = await sendProviderEmail({
+      to: settings.adminNotificationEmail,
+      subject,
+      text,
+      html: text.replaceAll("\n", "<br />")
+    });
+  }
+
+  await trackEvent("Assignment Submission Email Sent", {
+    studentId: student.id,
+    courseId: course.id,
+    studentStatus,
+    adminStatus
+  });
+
+  return studentStatus;
+}

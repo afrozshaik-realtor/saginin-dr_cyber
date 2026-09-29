@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { QuizBuilder } from "@/components/QuizBuilder";
 import { ResourcesEditor } from "@/components/ResourcesEditor";
-import type { Lesson, LessonKind } from "@/types/lms";
+import type { AssignmentSubmissionType, Lesson, LessonKind } from "@/types/lms";
 
 const kindOptions: { value: LessonKind; label: string }[] = [
   { value: "text", label: "Text / Reading" },
@@ -27,7 +27,11 @@ export function LessonForm({
   initialLesson?: Lesson;
 }) {
   const [kind, setKind] = useState<LessonKind>(initialLesson?.kind || "text");
+  const [submissionType, setSubmissionType] = useState<AssignmentSubmissionType>(
+    initialLesson?.kind === "assignment" ? initialLesson.submissionType : "link"
+  );
   const isEditing = Boolean(lessonId);
+  const existingTemplatePdfUrl = initialLesson?.kind === "assignment" ? initialLesson.templatePdfUrl : undefined;
 
   return (
     <form
@@ -179,13 +183,41 @@ export function LessonForm({
             <select
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
               name="submissionType"
-              defaultValue={initialLesson && initialLesson.kind === "assignment" ? initialLesson.submissionType : "link"}
+              value={submissionType}
+              onChange={(event) => setSubmissionType(event.target.value as AssignmentSubmissionType)}
             >
               <option value="link">Link (e.g. to a portfolio project)</option>
               <option value="text">Text response</option>
               <option value="file">File upload</option>
+              <option value="pdf-form">Fillable PDF form</option>
             </select>
           </label>
+
+          {submissionType === "pdf-form" ? (
+            <label className="block text-sm font-semibold">
+              Fillable PDF template
+              <input
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
+                name="templatePdfFile"
+                type="file"
+                accept="application/pdf"
+                required={!existingTemplatePdfUrl}
+              />
+              <p className="mt-1 text-xs font-normal text-slate-500">
+                Upload a PDF that has real fillable form fields (e.g. exported from Adobe Acrobat or a Word/Docs
+                form). Students fill it in on the lesson page and submit a completed copy.
+                {existingTemplatePdfUrl ? (
+                  <>
+                    {" "}
+                    <a className="text-blueglow hover:underline" href={existingTemplatePdfUrl} target="_blank" rel="noreferrer">
+                      View current template
+                    </a>
+                    . Leave this empty to keep it.
+                  </>
+                ) : null}
+              </p>
+            </label>
+          ) : null}
         </>
       ) : null}
 

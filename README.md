@@ -23,9 +23,18 @@ Each lesson is one of five kinds, picked when you add it in `/admin/courses`:
 - **Video** - paste a YouTube, Vimeo, or Loom URL; it's converted to an embeddable player automatically (`lib/embeds.ts`).
 - **Slides** - an embeddable URL (a Google Slides "Publish to web" embed link, or a PDF URL) shown in an iframe.
 - **Quiz** - multiple-choice questions built in the admin UI (`components/QuizBuilder.tsx`); students submit answers, get auto-graded instantly, and can retake it (every attempt is kept, `/admin` doesn't currently expose quiz history but it's in the store).
-- **Assignment** - written instructions plus a submission type: a link, a text response, or a file upload. Submitting marks the lesson complete immediately; `/admin/submissions` is where you review it and leave feedback afterward.
+- **Assignment** - written instructions plus a submission type: a link, a text response, a file upload, or a fillable PDF form (see below). Submitting marks the lesson complete immediately; `/admin/submissions` is where you review it and leave feedback afterward.
 
 Text/video/slides lessons keep the manual "Mark lesson complete" button; quiz and assignment lessons complete automatically on submission.
+
+### Fillable PDF assignments
+
+Pick "Fillable PDF form" as the submission type and upload a PDF that has real fillable AcroForm fields (exported from Adobe Acrobat, or a Word/Google Docs form) - not just a plain worksheet with no form fields, which can't be filled in reliably.
+
+- `lib/services/pdfForm.ts` (server-side, via `pdf-lib`) reads the template's fields - name, type (text/checkbox/radio/dropdown), on-page position, and options - with no headless browser required.
+- `components/PdfFormFiller.tsx` (client-side, via `pdfjs-dist`) renders each page of the template as an image in the browser and overlays real HTML inputs at each field's position, so the student fills it in looking like the original document.
+- On submit, the student's answers are used to fill and flatten a fresh copy of the original template server-side (`fillFormPdf`), producing the final submitted PDF - the original template file is never modified. That PDF is stored the same way a plain file-upload submission is, and both the student and the course's `ADMIN_NOTIFICATION_EMAIL` get an email with a link to it (`sendAssignmentSubmissionEmails` in `lib/services/email.ts`).
+- Submitting marks the lesson complete like any other assignment; `/admin/students` shows a completed-lesson count with a checkmark once every lesson in a course is done, so an admin can see assignment completion at a glance without opening each submission.
 
 ### Lesson resources
 

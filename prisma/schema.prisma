@@ -218,6 +218,7 @@ model AssignmentSubmission {
   fileName       String?   @map("file_name")
   link           String?   @db.Text
   text           String?   @db.Text
+  answersJson    Json?     @map("answers_json")
   status         String    @default("submitted")
   feedback       String?   @db.Text
   submittedAt    DateTime  @default(now()) @map("submitted_at")

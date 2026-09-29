@@ -55,7 +55,9 @@ export default async function AdminSubmissionsPage({ searchParams }: { searchPar
                 ) : null}
                 {submission.fileUrl ? (
                   <a className="text-blueglow" href={submission.fileUrl}>
-                    {submission.fileName || "Download submission"}
+                    {submission.submissionType === "pdf-form"
+                      ? "Download completed PDF"
+                      : submission.fileName || "Download submission"}
                   </a>
                 ) : null}
                 {submission.text ? <p className="whitespace-pre-line">{submission.text}</p> : null}

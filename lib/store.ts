@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildSeedCourses } from "@/lib/config/courses";
 import type { FunnelLead, MessageLog, PipelineRecord, QuizResponseRecord } from "@/types/funnel";
@@ -205,6 +205,7 @@ function serializeSubmission(row: Prisma.AssignmentSubmissionGetPayload<object>)
     fileName: row.fileName ?? undefined,
     link: row.link ?? undefined,
     text: row.text ?? undefined,
+    answers: (row.answersJson as Record<string, string | boolean>) ?? undefined,
     status: row.status as AssignmentSubmission["status"],
     feedback: row.feedback ?? undefined,
     submittedAt: row.submittedAt.toISOString(),
@@ -524,6 +525,19 @@ export async function getLessonProgressMap(studentId: string, courseId: string) 
   return map;
 }
 
+export async function listCompletedLessonCounts(): Promise<Record<string, number>> {
+  const rows = await prisma.lessonProgress.groupBy({
+    by: ["studentId", "courseId"],
+    where: { completed: true },
+    _count: { _all: true }
+  });
+  const map: Record<string, number> = {};
+  for (const row of rows) {
+    map[`${row.studentId}:${row.courseId}`] = row._count._all;
+  }
+  return map;
+}
+
 export async function listStudentsWithStats() {
   const rows = await prisma.student.findMany({
     include: { enrollments: true },
@@ -760,6 +774,7 @@ export async function createAssignmentSubmission(
       fileName: input.fileName,
       link: input.link,
       text: input.text,
+      answersJson: input.answers as unknown as Prisma.InputJsonValue,
       status: "submitted"
     },
     update: {
@@ -769,6 +784,7 @@ export async function createAssignmentSubmission(
       fileName: input.fileName ?? null,
       link: input.link ?? null,
       text: input.text ?? null,
+      answersJson: input.answers ? (input.answers as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       status: "submitted",
       feedback: null,
       reviewedAt: null
