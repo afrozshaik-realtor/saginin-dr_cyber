@@ -31,12 +31,6 @@ export const quizSubmitSchema = z.object({
   hp: z.string().max(0).optional().or(z.literal(""))
 });
 
-export const studentSignupSchema = z.object({
-  name: z.string().min(1).max(120),
-  email: z.string().email().max(160),
-  password: z.string().min(8).max(100)
-});
-
 export const studentLoginSchema = z.object({
   email: z.string().email().max(160),
   password: z.string().min(1).max(100)

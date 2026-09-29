@@ -50,7 +50,7 @@ export default function LandingPage({
             className="focus-ring inline-flex items-center justify-center rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
             href="/login"
           >
-            Members
+            Student
           </Link>
         </div>
         <div className="relative mx-auto grid min-h-[92vh] max-w-7xl gap-10 px-6 py-10 md:grid-cols-[1.05fr_.95fr] md:items-center lg:px-8">

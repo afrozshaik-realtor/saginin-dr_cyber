@@ -6,7 +6,7 @@ export default function LoginPage({
 }: {
   searchParams: { error?: string; redirect?: string };
 }) {
-  const redirectTo = searchParams.redirect || "/dashboard";
+  const redirectTo = searchParams.redirect || "/courses";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-navy px-4">
@@ -38,10 +38,7 @@ export default function LoginPage({
           Log in
         </button>
         <p className="mt-4 text-center text-sm text-slate-600">
-          Need an account?{" "}
-          <Link className="font-semibold text-blueglow" href={`/signup?redirect=${encodeURIComponent(redirectTo)}`}>
-            Sign up
-          </Link>
+          Student accounts are set up by an admin - check your email for an invite link.
         </p>
       </form>
     </main>
