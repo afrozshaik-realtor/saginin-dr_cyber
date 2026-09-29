@@ -140,12 +140,12 @@ Course content (modules/lessons, including quiz questions and assignment config)
 
 Visit `http://localhost:3000/admin/login`.
 
-Default credentials if no env is set:
+There are two ways to get in:
 
-- Email: `admin@example.com`
-- Password: `ChangeMe123!`
+1. **Env-var admin** (always available): `ADMIN_EMAIL` / `ADMIN_PASSWORD`, or `ADMIN_PASSWORD_HASH` for a bcrypt hash instead of a plaintext password. Defaults to `admin@example.com` / `ChangeMe123!` if unset - change these before deployment.
+2. **Self-registered admin account** (`/admin/register`, stored in the `admin_users` table): a one-time, first-run setup form. It only works while zero admin accounts exist in the database - as soon as one is created, the route stops accepting new registrations and just redirects to `/admin/login` (the "Create one" link on the login page also disappears). This is the easier path if you don't want to manage admin credentials through environment variables.
 
-Change these before deployment.
+Both methods work side by side - either logs you into the same admin session.
 
 ## Test The Funnel
 

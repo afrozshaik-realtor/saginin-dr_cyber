@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildSeedCourses } from "@/lib/config/courses";
 import type { FunnelLead, MessageLog, PipelineRecord, QuizResponseRecord } from "@/types/funnel";
 import type {
+  AdminUser,
   AssignmentSubmission,
   Course,
   CourseModule,
@@ -120,6 +121,17 @@ function serializeStudent(row: Prisma.StudentGetPayload<object>): Student {
     name: row.name,
     email: row.email,
     passwordHash: row.passwordHash,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function serializeAdminUser(row: Prisma.AdminUserGetPayload<object>): AdminUser {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    passwordHash: row.passwordHash,
+    role: row.role,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -436,6 +448,22 @@ export async function updateStudentPassword(id: string, passwordHash: string) {
   if (!existing) return null;
   const row = await prisma.student.update({ where: { id }, data: { passwordHash } });
   return serializeStudent(row);
+}
+
+export async function countAdminUsers() {
+  return prisma.adminUser.count();
+}
+
+export async function getAdminUserByEmail(email: string) {
+  const row = await prisma.adminUser.findUnique({ where: { email } });
+  return row ? serializeAdminUser(row) : null;
+}
+
+export async function createAdminUser(input: { name: string; email: string; passwordHash: string }) {
+  const existing = await prisma.adminUser.findUnique({ where: { email: input.email } });
+  if (existing) return null;
+  const row = await prisma.adminUser.create({ data: { ...input, role: "admin" } });
+  return serializeAdminUser(row);
 }
 
 export async function enrollStudent(
