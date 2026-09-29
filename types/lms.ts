@@ -89,6 +89,15 @@ export type Student = {
   createdAt: string;
 };
 
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: string;
+  createdAt: string;
+};
+
 export type PaymentStatus = "unpaid" | "paid" | "dev-mode" | "granted" | "free";
 
 export type Enrollment = {

@@ -36,6 +36,12 @@ export const studentLoginSchema = z.object({
   password: z.string().min(1).max(100)
 });
 
+export const adminRegisterSchema = z.object({
+  name: z.string().min(1).max(120),
+  email: z.string().email().max(160),
+  password: z.string().min(8).max(100)
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.string().email().max(160)
 });
