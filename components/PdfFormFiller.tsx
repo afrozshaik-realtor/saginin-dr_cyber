@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PdfFormMeta } from "@/lib/services/pdfForm";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// Served with a .js extension (not the .mjs the package ships) because some shared-hosting
+// static-file layers (e.g. Apache/LiteSpeed on Hostinger) don't have a MIME type mapping for
+// .mjs and serve it with the wrong Content-Type, which the module worker below then rejects.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
 type Answers = Record<string, string | boolean>;
 
