@@ -1,22 +1,36 @@
 import { AdminNav } from "@/components/AdminNav";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { grantAccessAction } from "@/lib/actions/admin";
 import { formatPrice } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 import { listAllCoursesAdmin, listStudentsWithStats } from "@/lib/store";
+import { createAccessToken } from "@/lib/studentAuth";
 
-const grantMessages: Record<string, { text: string; tone: "success" | "error" }> = {
-  success: { text: "Access granted - the student has been emailed a link to start the course.", tone: "success" },
-  error: { text: "Could not grant access. Check the email and course, then try again.", tone: "error" }
-};
+function grantMessage(grant: string | undefined, mailed: string | undefined) {
+  if (grant === "error") {
+    return { text: "Could not grant access. Check the email and course, then try again.", tone: "error" as const };
+  }
+  if (grant === "success") {
+    if (mailed === "1") {
+      return { text: "Access granted - the student has been emailed a link to start the course.", tone: "success" as const };
+    }
+    return {
+      text: "Access granted, but the email could not be confirmed as delivered (no email provider configured, or it failed). Copy the student's access link below and send it to them directly.",
+      tone: "warning" as const
+    };
+  }
+  return undefined;
+}
 
 export default async function AdminStudentsPage({
   searchParams
 }: {
-  searchParams: { grant?: string };
+  searchParams: { grant?: string; mailed?: string };
 }) {
   requireAdmin();
   const [students, courses] = await Promise.all([listStudentsWithStats(), listAllCoursesAdmin()]);
-  const grantMessage = searchParams.grant ? grantMessages[searchParams.grant] : undefined;
+  const message = grantMessage(searchParams.grant, searchParams.mailed);
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
 
   return (
     <main className="min-h-screen bg-cloud">
@@ -30,13 +44,17 @@ export default async function AdminStudentsPage({
             Enroll someone directly (comp access, manual payment, corporate deal) and email them a link that signs
             them in and takes them straight to the course. Works for an existing student or a brand-new email.
           </p>
-          {grantMessage ? (
+          {message ? (
             <p
               className={`mt-4 rounded-md p-3 text-sm ${
-                grantMessage.tone === "success" ? "bg-mint/10 text-emerald-700" : "bg-red-50 text-red-700"
+                message.tone === "success"
+                  ? "bg-mint/10 text-emerald-700"
+                  : message.tone === "warning"
+                    ? "bg-amber-50 text-amber-800"
+                    : "bg-red-50 text-red-700"
               }`}
             >
-              {grantMessage.text}
+              {message.text}
             </p>
           ) : null}
           <form action={grantAccessAction} className="mt-4 grid gap-3 md:grid-cols-[1.2fr_1fr_1.2fr_auto]">
@@ -71,6 +89,7 @@ export default async function AdminStudentsPage({
                 <th className="p-3">Name</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Enrolled courses</th>
+                <th className="p-3">Access links</th>
                 <th className="p-3">Paid</th>
                 <th className="p-3">Joined</th>
               </tr>
@@ -85,6 +104,21 @@ export default async function AdminStudentsPage({
                       .map((enrollment) => courses.find((course) => course.id === enrollment.courseId)?.title)
                       .filter(Boolean)
                       .join(", ") || "None"}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-col gap-1">
+                      {student.enrollments.map((enrollment) => {
+                        const course = courses.find((item) => item.id === enrollment.courseId);
+                        if (!course) return null;
+                        const link = `${appUrl}/access/${createAccessToken(student.id, course.slug)}`;
+                        return (
+                          <div key={enrollment.id} className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">{course.title}:</span>
+                            <CopyLinkButton link={link} className="text-xs font-semibold text-blueglow hover:underline" />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </td>
                   <td className="p-3">
                     {formatPrice(

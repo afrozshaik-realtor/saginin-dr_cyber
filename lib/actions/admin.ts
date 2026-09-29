@@ -70,9 +70,9 @@ export async function grantAccessAction(formData: FormData) {
   const appUrl = process.env.APP_URL || "http://localhost:3000";
   const token = createAccessToken(student!.id, course!.slug);
   const accessLink = `${appUrl}/access/${token}`;
-  await sendCourseAccessEmail(student!, course!, accessLink);
+  const status = await sendCourseAccessEmail(student!, course!, accessLink);
 
-  redirect("/admin/students?grant=success");
+  redirect(`/admin/students?grant=success&mailed=${status === "sent" ? "1" : "0"}`);
 }
 
 function courseFieldsFromFormData(formData: FormData) {
