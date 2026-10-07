@@ -7,7 +7,7 @@ import { getStudentSessionId } from "@/lib/studentAuth";
 async function serveFile(relativePath: string, fileName: string) {
   try {
     const bytes = await readUploadedFile(relativePath);
-    return new NextResponse(bytes, {
+    return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Disposition": `attachment; filename="${fileName}"`,
         "Content-Type": "application/octet-stream"
