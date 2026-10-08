@@ -107,7 +107,7 @@ async function r2Request(method: "PUT" | "GET", key: string, body?: Buffer) {
                 "x-amz-date": amzDate,
                 authorization
         },
-        body
+      body: body ? new Uint8Array(body) : undefined
   });
 }
 
