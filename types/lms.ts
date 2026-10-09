@@ -10,6 +10,7 @@ export type QuizQuestion = {
   id: string;
   prompt: string;
   options: QuizOption[];
+  explanation?: string;
 };
 
 export type AssignmentSubmissionType = "file" | "link" | "text" | "pdf-form";

@@ -79,7 +79,8 @@ export const quizOptionSchema = z.object({
 export const quizQuestionSchema = z.object({
   id: z.string(),
   prompt: z.string().min(1).max(600),
-  options: z.array(quizOptionSchema).min(2).max(8)
+  options: z.array(quizOptionSchema).min(2).max(8),
+  explanation: z.string().max(1000).optional()
 });
 
 export const quizQuestionsSchema = z.array(quizQuestionSchema).min(1).max(50);
