@@ -202,8 +202,21 @@ async function parseResourcesFromFormData(formData: FormData, courseId: string):
     if (entry.kind === "file") {
       const file = formData.get(`resourceFile-${entry.id}`);
       if (file instanceof File && file.size > 0) {
-        const uploaded = await saveUploadedFile(file, `lesson-resources/${courseId}`);
-        url = uploaded.url;
+        try {
+          const uploaded = await saveUploadedFile(file, `lesson-resources/${courseId}`);
+          url = uploaded.url;
+        } catch (err: unknown) {
+          const error = err as Error & { cause?: unknown };
+          console.error(
+            "[lesson-resource-upload] saveUploadedFile failed:",
+            "fileName=", file.name,
+            "fileSize=", file.size,
+            "fileType=", file.type,
+            "message=", error?.message,
+            "cause=", error?.cause ? String(error.cause) : undefined
+          );
+          throw err;
+        }
       }
     }
     if (!url) continue;
@@ -262,8 +275,21 @@ async function parseLessonFromFormData(
     if (submissionType === "pdf-form") {
       const file = formData.get("templatePdfFile");
       if (file instanceof File && file.size > 0) {
-        const uploaded = await saveUploadedFile(file, `assignment-templates/${courseId}`);
-        templatePdfUrl = uploaded.url;
+        try {
+          const uploaded = await saveUploadedFile(file, `assignment-templates/${courseId}`);
+          templatePdfUrl = uploaded.url;
+        } catch (err: unknown) {
+          const error = err as Error & { cause?: unknown };
+          console.error(
+            "[assignment-template-upload] saveUploadedFile failed:",
+            "fileName=", file.name,
+            "fileSize=", file.size,
+            "fileType=", file.type,
+            "message=", error?.message,
+            "cause=", error?.cause ? String(error.cause) : undefined
+          );
+          throw err;
+        }
       } else if (existingLesson?.kind === "assignment") {
         templatePdfUrl = existingLesson.templatePdfUrl;
       }
