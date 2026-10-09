@@ -183,15 +183,28 @@ export async function moveLessonAction(formData: FormData) {
 }
 
 async function parseResourcesFromFormData(formData: FormData, courseId: string): Promise<LessonResource[]> {
+  console.error(
+    "[parseResourcesFromFormData] entry. formData keys=",
+    Array.from(formData.keys()),
+    "entries=",
+    Array.from(formData.entries()).map(([k, v]) =>
+      v instanceof File ? `${k}=File(name=${v.name},size=${v.size},type=${v.type})` : `${k}=${String(v).slice(0, 80)}`
+    )
+  );
   const raw = String(formData.get("resourcesJson") || "[]");
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.error("[parseResourcesFromFormData] JSON.parse of resourcesJson failed:", raw.slice(0, 200), err);
     return [];
   }
   const parsed = lessonResourcesSchema.safeParse(parsedJson);
-  if (!parsed.success) return [];
+  if (!parsed.success) {
+    console.error("[parseResourcesFromFormData] schema validation failed:", JSON.stringify(parsed.error.issues));
+    return [];
+  }
+  console.error("[parseResourcesFromFormData] parsed", parsed.data.length, "resource entries:", JSON.stringify(parsed.data));
 
   const resources: LessonResource[] = [];
   for (const entry of parsed.data) {
@@ -304,17 +317,21 @@ async function parseLessonFromFormData(
 
 export async function createLessonAction(formData: FormData) {
   requireAdmin();
+  console.error("[createLessonAction] entry");
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lesson = await parseLessonFromFormData(formData, courseId);
+  console.error("[createLessonAction] parseLessonFromFormData returned", lesson ? "a lesson" : "null");
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await addLesson(courseId, moduleId, lesson!);
+  console.error("[createLessonAction] addLesson completed, redirecting");
   redirect(`/admin/courses/${courseId}`);
 }
 
 export async function updateLessonAction(formData: FormData) {
   requireAdmin();
+  console.error("[updateLessonAction] entry");
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lessonId = String(formData.get("lessonId") || "");
@@ -324,9 +341,11 @@ export async function updateLessonAction(formData: FormData) {
     course?.modules.find((item) => item.id === moduleId)?.lessons.find((item) => item.id === lessonId) || null;
 
   const lesson = await parseLessonFromFormData(formData, courseId, existingLesson);
+  console.error("[updateLessonAction] parseLessonFromFormData returned", lesson ? "a lesson" : "null");
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await updateLesson(courseId, moduleId, lessonId, lesson!);
+  console.error("[updateLessonAction] updateLesson completed, redirecting");
   redirect(`/admin/courses/${courseId}`);
 }
 
