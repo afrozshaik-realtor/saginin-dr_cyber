@@ -2,6 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { sendCourseAccessEmail } from "@/lib/services/email";
 import { saveUploadedFile } from "@/lib/services/storage";
@@ -74,6 +75,7 @@ export async function grantAccessAction(formData: FormData) {
   const accessLink = `${appUrl}/access/${token}`;
   const status = await sendCourseAccessEmail(student!, course!, accessLink);
 
+  revalidatePath("/admin/students");
   redirect(`/admin/students?grant=success&mailed=${status === "sent" ? "1" : "0"}`);
 }
 
@@ -99,6 +101,7 @@ export async function createCourseAction(formData: FormData) {
 
   const course = await createCourse(parsed.data);
   if (!course) redirect("/admin/courses/new?error=1");
+  revalidatePath("/admin/courses");
   redirect(`/admin/courses/${course!.id}`);
 }
 
@@ -109,6 +112,7 @@ export async function updateCourseAction(formData: FormData) {
   if (!parsed.success) redirect(`/admin/courses/${id}?error=1`);
 
   await updateCourse(id, parsed.data);
+  revalidatePath(`/admin/courses/${id}`);
   redirect(`/admin/courses/${id}?saved=1`);
 }
 
@@ -116,6 +120,7 @@ export async function deleteCourseAction(formData: FormData) {
   requireAdmin();
   const id = String(formData.get("id") || "");
   await deleteCourse(id);
+  revalidatePath("/admin/courses");
   redirect("/admin/courses");
 }
 
@@ -124,6 +129,7 @@ export async function addModuleAction(formData: FormData) {
   const courseId = String(formData.get("courseId") || "");
   const title = String(formData.get("title") || "").trim();
   if (title) await addModule(courseId, title);
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -133,6 +139,7 @@ export async function renameModuleAction(formData: FormData) {
   const moduleId = String(formData.get("moduleId") || "");
   const title = String(formData.get("title") || "").trim();
   if (title) await updateModule(courseId, moduleId, title);
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -141,6 +148,7 @@ export async function deleteModuleAction(formData: FormData) {
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   await deleteModule(courseId, moduleId);
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -159,6 +167,7 @@ export async function moveModuleAction(formData: FormData) {
     [ids[index], ids[swapWith]] = [ids[swapWith], ids[index]];
     await reorderModules(courseId, ids);
   }
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -179,57 +188,48 @@ export async function moveLessonAction(formData: FormData) {
     [ids[index], ids[swapWith]] = [ids[swapWith], ids[index]];
     await reorderLessons(courseId, moduleId, ids);
   }
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
 async function parseResourcesFromFormData(formData: FormData, courseId: string): Promise<LessonResource[]> {
-  console.error(
-    "[parseResourcesFromFormData] entry. formData keys=",
-    Array.from(formData.keys()),
-    "entries=",
-    Array.from(formData.entries()).map(([k, v]) =>
-      v instanceof File ? `${k}=File(name=${v.name},size=${v.size},type=${v.type})` : `${k}=${String(v).slice(0, 80)}`
-    )
-  );
   const raw = String(formData.get("resourcesJson") || "[]");
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
-  } catch (err) {
-    console.error("[parseResourcesFromFormData] JSON.parse of resourcesJson failed:", raw.slice(0, 200), err);
+  } catch {
     return [];
   }
   const parsed = lessonResourcesSchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    console.error("[parseResourcesFromFormData] schema validation failed:", JSON.stringify(parsed.error.issues));
-    return [];
-  }
-  console.error("[parseResourcesFromFormData] parsed", parsed.data.length, "resource entries:", JSON.stringify(parsed.data));
+  if (!parsed.success) return [];
 
   const resources: LessonResource[] = [];
   for (const entry of parsed.data) {
-    const label = entry.label.trim();
+    let url = (entry.url || "").trim();
+    const file =
+      entry.kind === "file" ? formData.get(`resourceFile-${entry.id}`) : null;
+    const hasFile = file instanceof File && file.size > 0;
+
+    // A file resource with no label defaults to the uploaded file's name,
+    // rather than silently dropping the resource.
+    const label = entry.label.trim() || (hasFile ? (file as File).name : "");
     if (!label) continue;
 
-    let url = (entry.url || "").trim();
-    if (entry.kind === "file") {
-      const file = formData.get(`resourceFile-${entry.id}`);
-      if (file instanceof File && file.size > 0) {
-        try {
-          const uploaded = await saveUploadedFile(file, `lesson-resources/${courseId}`);
-          url = uploaded.url;
-        } catch (err: unknown) {
-          const error = err as Error & { cause?: unknown };
-          console.error(
-            "[lesson-resource-upload] saveUploadedFile failed:",
-            "fileName=", file.name,
-            "fileSize=", file.size,
-            "fileType=", file.type,
-            "message=", error?.message,
-            "cause=", error?.cause ? String(error.cause) : undefined
-          );
-          throw err;
-        }
+    if (hasFile) {
+      try {
+        const uploaded = await saveUploadedFile(file as File, `lesson-resources/${courseId}`);
+        url = uploaded.url;
+      } catch (err: unknown) {
+        const error = err as Error & { cause?: unknown };
+        console.error(
+          "[lesson-resource-upload] saveUploadedFile failed:",
+          "fileName=", (file as File).name,
+          "fileSize=", (file as File).size,
+          "fileType=", (file as File).type,
+          "message=", error?.message,
+          "cause=", error?.cause ? String(error.cause) : undefined
+        );
+        throw err;
       }
     }
     if (!url) continue;
@@ -317,21 +317,18 @@ async function parseLessonFromFormData(
 
 export async function createLessonAction(formData: FormData) {
   requireAdmin();
-  console.error("[createLessonAction] entry");
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lesson = await parseLessonFromFormData(formData, courseId);
-  console.error("[createLessonAction] parseLessonFromFormData returned", lesson ? "a lesson" : "null");
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await addLesson(courseId, moduleId, lesson!);
-  console.error("[createLessonAction] addLesson completed, redirecting");
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
 export async function updateLessonAction(formData: FormData) {
   requireAdmin();
-  console.error("[updateLessonAction] entry");
   const courseId = String(formData.get("courseId") || "");
   const moduleId = String(formData.get("moduleId") || "");
   const lessonId = String(formData.get("lessonId") || "");
@@ -341,11 +338,10 @@ export async function updateLessonAction(formData: FormData) {
     course?.modules.find((item) => item.id === moduleId)?.lessons.find((item) => item.id === lessonId) || null;
 
   const lesson = await parseLessonFromFormData(formData, courseId, existingLesson);
-  console.error("[updateLessonAction] parseLessonFromFormData returned", lesson ? "a lesson" : "null");
   if (!lesson) redirect(`/admin/courses/${courseId}?error=lesson`);
 
   await updateLesson(courseId, moduleId, lessonId, lesson!);
-  console.error("[updateLessonAction] updateLesson completed, redirecting");
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -355,6 +351,7 @@ export async function deleteLessonAction(formData: FormData) {
   const moduleId = String(formData.get("moduleId") || "");
   const lessonId = String(formData.get("lessonId") || "");
   await deleteLesson(courseId, moduleId, lessonId);
+  revalidatePath(`/admin/courses/${courseId}`);
   redirect(`/admin/courses/${courseId}`);
 }
 
@@ -363,5 +360,6 @@ export async function reviewSubmissionAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   const feedback = String(formData.get("feedback") || "");
   await reviewAssignmentSubmission(id, feedback);
+  revalidatePath("/admin/submissions");
   redirect("/admin/submissions?reviewed=1");
 }
