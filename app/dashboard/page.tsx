@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getLessonCount } from "@/lib/config/courses";
+import { findLesson, getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
-import { getCourseById, getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
+import {
+  getCourseById,
+  getLessonProgressMap,
+  listEnrollmentsForStudent,
+  listQuizAttemptsForStudent
+} from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
+import type { Course } from "@/types/lms";
 
 export default async function DashboardPage() {
   const student = await requireStudent("/dashboard");
@@ -32,6 +38,21 @@ export default async function DashboardPage() {
   );
 
   const active = enrolledCourses.filter(Boolean) as NonNullable<(typeof enrolledCourses)[number]>[];
+  const courseById = new Map<string, Course>(active.map(({ course }) => [course.id, course]));
+
+  const quizAttempts = await listQuizAttemptsForStudent(student.id);
+  const quizHistory = quizAttempts
+    .map((attempt) => {
+      const course = courseById.get(attempt.courseId);
+      const lesson = course ? findLesson(course, attempt.lessonId) : null;
+      if (!course || !lesson) return null;
+      return { attempt, course, lesson };
+    })
+    .filter(Boolean) as {
+    attempt: (typeof quizAttempts)[number];
+    course: Course;
+    lesson: NonNullable<ReturnType<typeof findLesson>>;
+  }[];
 
   return (
     <main className="min-h-screen bg-cloud">
@@ -70,6 +91,42 @@ export default async function DashboardPage() {
             <Link className="mt-4 inline-flex font-semibold text-blueglow" href="/courses">
               Browse the course library
             </Link>
+          </div>
+        ) : null}
+
+        {quizHistory.length ? (
+          <div className="mt-10">
+            <h2 className="text-xl font-bold">Quiz history</h2>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-cloud text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Course</th>
+                    <th className="px-4 py-3">Quiz</th>
+                    <th className="px-4 py-3">Score</th>
+                    <th className="px-4 py-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {quizHistory.map(({ attempt, course, lesson }) => (
+                    <tr key={attempt.id}>
+                      <td className="px-4 py-3">
+                        <Link className="text-blueglow hover:underline" href={`/learn/${course.slug}?lesson=${lesson.id}`}>
+                          {course.title}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">{lesson.title}</td>
+                      <td className="px-4 py-3">
+                        {attempt.correctCount} / {attempt.totalCount} ({attempt.scorePercent}%)
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {new Date(attempt.submittedAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
       </section>

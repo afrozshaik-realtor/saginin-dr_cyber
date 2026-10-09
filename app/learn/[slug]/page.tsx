@@ -12,7 +12,7 @@ import {
   getAssignmentSubmission,
   getCourseBySlug,
   getEnrollment,
-  getLatestQuizAttempt,
+  getLatestQuizAttemptsForCourse,
   getLessonProgressMap
 } from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
@@ -51,8 +51,22 @@ export default async function LearnPage({
   const activeIndex = flatLessons.findIndex((lesson) => lesson.id === activeLessonId);
   const nextLesson = activeIndex >= 0 ? flatLessons[activeIndex + 1] : undefined;
 
-  const quizAttempt =
-    activeLesson?.kind === "quiz" ? await getLatestQuizAttempt(student.id, activeLesson.id) : null;
+  const quizAttemptsByLessonId = await getLatestQuizAttemptsForCourse(student.id, course!.id);
+  const quizAttempt = activeLesson?.kind === "quiz" ? quizAttemptsByLessonId.get(activeLesson.id) || null : null;
+
+  const moduleQuizScores = new Map<string, { correct: number; total: number }>();
+  for (const courseModule of course!.modules) {
+    let correct = 0;
+    let total = 0;
+    for (const lesson of courseModule.lessons) {
+      if (lesson.kind !== "quiz") continue;
+      const attempt = quizAttemptsByLessonId.get(lesson.id);
+      if (!attempt) continue;
+      correct += attempt.correctCount;
+      total += attempt.totalCount;
+    }
+    if (total > 0) moduleQuizScores.set(courseModule.id, { correct, total });
+  }
   const assignmentSubmission =
     activeLesson?.kind === "assignment" ? await getAssignmentSubmission(student.id, activeLesson.id) : null;
   let pdfFormMeta: PdfFormMeta | null = null;
@@ -78,9 +92,18 @@ export default async function LearnPage({
           <p className="mt-2 text-xs font-semibold text-slate-500">{percent}% complete</p>
 
           <div className="mt-5 space-y-5">
-            {course!.modules.map((courseModule) => (
+            {course!.modules.map((courseModule) => {
+              const quizScore = moduleQuizScores.get(courseModule.id);
+              return (
               <div key={courseModule.id}>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{courseModule.title}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{courseModule.title}</p>
+                  {quizScore ? (
+                    <span className="text-xs font-semibold text-mint">
+                      Quiz avg: {Math.round((quizScore.correct / quizScore.total) * 100)}%
+                    </span>
+                  ) : null}
+                </div>
                 <ul className="mt-2 space-y-1">
                   {courseModule.lessons.map((lesson) => (
                     <li key={lesson.id}>
@@ -98,7 +121,8 @@ export default async function LearnPage({
                   ))}
                 </ul>
               </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
 
@@ -149,45 +173,78 @@ export default async function LearnPage({
               {activeLesson.kind === "quiz" ? (
                 <div className="mt-4">
                   {quizAttempt ? (
-                    <div className="mb-6 rounded-md border border-slate-200 bg-cloud p-4">
-                      <p className="font-semibold">
-                        Last score: {quizAttempt.correctCount} / {quizAttempt.totalCount} ({quizAttempt.scorePercent}%)
-                      </p>
-                      <p className="mt-1 text-sm text-slate-600">Submit again below to retake the quiz.</p>
+                    <div className="mb-6 space-y-4">
+                      <div className="rounded-md border border-slate-200 bg-cloud p-4">
+                        <p className="font-semibold">
+                          Score: {quizAttempt.correctCount} / {quizAttempt.totalCount} ({quizAttempt.scorePercent}%)
+                        </p>
+                      </div>
+                      {activeLesson.questions.map((question, qIndex) => {
+                        const selectedId = quizAttempt.answers[question.id];
+                        const selectedOption = question.options.find((option) => option.id === selectedId);
+                        const correctOption = question.options.find((option) => option.correct);
+                        const wasCorrect = selectedOption?.correct ?? false;
+                        return (
+                          <div
+                            key={question.id}
+                            className={clsx(
+                              "rounded-md border p-4",
+                              wasCorrect ? "border-mint/50 bg-mint/5" : "border-red-200 bg-red-50"
+                            )}
+                          >
+                            <p className="text-sm font-semibold">
+                              {qIndex + 1}. {question.prompt}
+                            </p>
+                            <p className="mt-1 text-sm">
+                              Your answer: {selectedOption?.text || "(no answer)"}{" "}
+                              {wasCorrect ? (
+                                <span className="font-semibold text-mint">Correct</span>
+                              ) : (
+                                <span className="font-semibold text-red-600">Incorrect</span>
+                              )}
+                            </p>
+                            {!wasCorrect && correctOption ? (
+                              <p className="mt-1 text-sm text-slate-700">Correct answer: {correctOption.text}</p>
+                            ) : null}
+                            {question.explanation ? (
+                              <p className="mt-2 text-sm text-slate-600">{question.explanation}</p>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                   {activeLesson.questions.length ? (
-                    <form action={submitQuizAction} className="space-y-6">
-                      <input type="hidden" name="slug" value={params.slug} />
-                      <input type="hidden" name="lessonId" value={activeLesson.id} />
-                      {activeLesson.questions.map((question, qIndex) => (
-                        <fieldset key={question.id} className="rounded-md border border-slate-200 p-4">
-                          <legend className="px-1 text-sm font-semibold">
-                            {qIndex + 1}. {question.prompt}
-                          </legend>
-                          <div className="mt-2 space-y-2">
-                            {question.options.map((option) => (
-                              <label key={option.id} className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="radio"
-                                  name={`question-${question.id}`}
-                                  value={option.id}
-                                  required
-                                  defaultChecked={quizAttempt?.answers[question.id] === option.id}
-                                />
-                                {option.text}
-                              </label>
-                            ))}
-                          </div>
-                        </fieldset>
-                      ))}
-                      <button
-                        className="rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
-                        type="submit"
-                      >
-                        {quizAttempt ? "Resubmit quiz" : "Submit quiz"}
-                      </button>
-                    </form>
+                    <details open={!quizAttempt}>
+                      {quizAttempt ? (
+                        <summary className="cursor-pointer text-sm font-semibold text-blueglow">Retake quiz</summary>
+                      ) : null}
+                      <form action={submitQuizAction} className="mt-4 space-y-6">
+                        <input type="hidden" name="slug" value={params.slug} />
+                        <input type="hidden" name="lessonId" value={activeLesson.id} />
+                        {activeLesson.questions.map((question, qIndex) => (
+                          <fieldset key={question.id} className="rounded-md border border-slate-200 p-4">
+                            <legend className="px-1 text-sm font-semibold">
+                              {qIndex + 1}. {question.prompt}
+                            </legend>
+                            <div className="mt-2 space-y-2">
+                              {question.options.map((option) => (
+                                <label key={option.id} className="flex items-center gap-2 text-sm">
+                                  <input type="radio" name={`question-${question.id}`} value={option.id} required />
+                                  {option.text}
+                                </label>
+                              ))}
+                            </div>
+                          </fieldset>
+                        ))}
+                        <button
+                          className="rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
+                          type="submit"
+                        >
+                          {quizAttempt ? "Resubmit quiz" : "Submit quiz"}
+                        </button>
+                      </form>
+                    </details>
                   ) : (
                     <p className="text-slate-600">This quiz has no questions yet.</p>
                   )}

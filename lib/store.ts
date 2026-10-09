@@ -758,6 +758,28 @@ export async function getLatestQuizAttempt(studentId: string, lessonId: string) 
   return row ? serializeQuizAttempt(row) : null;
 }
 
+/** Latest attempt per lesson for every quiz lesson a student has taken in a course, keyed by lessonId. */
+export async function getLatestQuizAttemptsForCourse(studentId: string, courseId: string) {
+  const rows = await prisma.quizAttempt.findMany({
+    where: { studentId, courseId },
+    orderBy: { submittedAt: "desc" }
+  });
+  const byLessonId = new Map<string, QuizAttempt>();
+  for (const row of rows) {
+    if (!byLessonId.has(row.lessonId)) byLessonId.set(row.lessonId, serializeQuizAttempt(row));
+  }
+  return byLessonId;
+}
+
+/** Every quiz attempt a student has ever submitted, across all courses, most recent first. */
+export async function listQuizAttemptsForStudent(studentId: string) {
+  const rows = await prisma.quizAttempt.findMany({
+    where: { studentId },
+    orderBy: { submittedAt: "desc" }
+  });
+  return rows.map(serializeQuizAttempt);
+}
+
 // --- Assignment submissions ---
 
 export async function createAssignmentSubmission(
