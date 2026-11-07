@@ -15,27 +15,27 @@ export const blogImages = {
   },
   beginnerConfidence: {
     src: `${base}/adult-learning-cybersecurity-at-home.webp`,
-    alt: "An adult beginner studying cybersecurity on a laptop at home.",
+    alt: "A smiling adult beginner learns computer and cybersecurity basics on a laptop at home, with a four-step plan on screen: get comfortable with your computer, learn key security habits, protect your information and build confidence one step at a time.",
     ...size
   },
   homeSecurityAnalogy: {
     src: `${base}/home-security-vs-cybersecurity-analogy.webp`,
-    alt: "Comparison of home security and cybersecurity: door locks match passwords, cameras match monitoring and alarms match security alerts.",
+    alt: "Home security compared with cybersecurity: locking doors, using cameras and setting alarms on one side match using strong passwords, monitoring activity and keeping systems protected on the other.",
     ...size
   },
   healthcarePhishing: {
     src: `${base}/healthcare-worker-reviewing-suspicious-email.webp`,
-    alt: "A healthcare worker reviewing a suspicious email that pretends to come from IT support and asks for a password.",
+    alt: "A healthcare worker in scrubs and an IT colleague review a suspicious email on a hospital computer, with a checklist asking: unexpected email, suspicious link, urgent or threatening, asking for your password?",
     ...size
   },
   careerOutlook: {
     src: `${base}/cybersecurity-career-growth-outlook.webp`,
-    alt: "Infographic of projected employment growth for information security analysts, based on U.S. Bureau of Labor Statistics data.",
+    alt: "Cybersecurity career outlook infographic: 21% projected U.S. growth, 2025 to 2035, for information security analysts, citing the U.S. Bureau of Labor Statistics.",
     ...size
   },
   industries: {
     src: `${base}/industries-that-need-cybersecurity.webp`,
-    alt: "Healthcare, banking, e-commerce and government shown around a central security shield.",
+    alt: "Cybersecurity protects every industry: healthcare keeps patient information private and hospital systems safe, banking protects transactions and accounts, e-commerce secures online payments and customer data, and government safeguards public services and citizen information.",
     ...size
   },
   noCoding: {
