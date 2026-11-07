@@ -6,16 +6,19 @@ export function getAppUrl() {
 }
 
 /**
- * Destination for every "$29 USD beginner course" call to action.
- *
- * Courses live in the database (managed from /admin/courses), so the slug of the
- * $29 course is not in the codebase. Until it is confirmed, CTAs point at the real
- * course catalogue. Set BLOG_BEGINNER_COURSE_PATH (e.g. "/courses/<slug>") to
- * point them at the course detail page, which starts the existing Stripe checkout.
+ * Destination for every "$29 USD beginner course" call to action: the course detail page,
+ * whose enrol button starts the existing Stripe checkout. Courses are database-managed, so
+ * override with BLOG_BEGINNER_COURSE_PATH (e.g. "/courses/<slug>") if the slug ever changes.
+ * Note this course slug happens to match the article slug; they live under different routes
+ * (/courses/... vs /blogs/...).
  */
+export const DEFAULT_BEGINNER_COURSE_PATH = "/courses/switch-to-cybersecurity-guide";
+
 export function getBeginnerCoursePath() {
   const configured = process.env.BLOG_BEGINNER_COURSE_PATH;
-  return configured && configured.startsWith("/") && !configured.startsWith("//") ? configured : "/courses";
+  return configured && configured.startsWith("/") && !configured.startsWith("//")
+    ? configured
+    : DEFAULT_BEGINNER_COURSE_PATH;
 }
 
 export const COURSE_PRICE_LABEL = "$29 USD";
