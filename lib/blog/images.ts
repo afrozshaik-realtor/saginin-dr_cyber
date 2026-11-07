@@ -40,17 +40,17 @@ export const blogImages = {
   },
   noCoding: {
     src: `${base}/coding-vs-non-coding-cybersecurity-roles.webp`,
-    alt: "Comparison of cybersecurity roles that involve more coding and roles that involve little or none.",
+    alt: "Cybersecurity is not just coding: non-coding security roles that monitor, review, plan, train and ensure compliance, beside technical roles that work with code, tools and systems, both built on people, processes, technology and protection.",
     ...size
   },
   careerPaths: {
     src: `${base}/five-beginner-cybersecurity-career-paths.webp`,
-    alt: "Five cards showing beginner-friendly routes: IT help desk, junior SOC analyst, compliance assistant, security awareness coordinator and vulnerability management assistant.",
+    alt: "Five beginner cybersecurity career paths: IT help desk and technical support, junior SOC analyst, security compliance and GRC assistant, security awareness coordinator, and vulnerability management assistant, each with a one-line description.",
     ...size
   },
   salary: {
     src: `${base}/cybersecurity-salary-us-vs-canada.webp`,
-    alt: "Occupational median wages for information security analysts in the United States and cybersecurity specialists in Canada.",
+    alt: "Salary outlook infographic: U.S. information security analysts, US$129,180 median annual wage; Canadian cybersecurity specialists, CA$49.52 median hourly wage; labelled occupational medians, not beginner salaries.",
     ...size
   },
   roadmap: {
@@ -60,7 +60,7 @@ export const blogImages = {
   },
   plan90Day: {
     src: `${base}/90-day-cybersecurity-learning-plan.webp`,
-    alt: "Three-month timeline: computer fundamentals, cybersecurity foundations, then practice and career exploration.",
+    alt: "90-day cybersecurity learning timeline: Month 1 computer fundamentals, Month 2 cybersecurity protection, Month 3 hands-on practice and career exploration.",
     ...size
   },
   transferableSkills: {

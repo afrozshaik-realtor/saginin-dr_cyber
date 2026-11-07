@@ -14,6 +14,7 @@ import {
 import { CourseOfferCard, InlineCta, PrimaryCta } from "@/components/blog/CourseCta";
 import { Faq } from "@/components/blog/Faq";
 import { Figure } from "@/components/blog/Figure";
+import { OverlayFigure } from "@/components/blog/OverlayFigure";
 import { MARKETING_SITE_URL } from "@/lib/blog/config";
 import type { BlogFaq, BlogPost, BlogSource, BlogTocItem } from "../types";
 
@@ -327,7 +328,14 @@ function Body() {
         <p>Learn common threats, strong passwords and password managers, access controls, identity protection and core security concepts. Try describing each threat with an everyday analogy.</p>
         <SubHeading>Days 61–90: Practice and Career Exploration</SubHeading>
         <p>Use authorized practice labs, start a learning portfolio, research roles that interest you and decide on your next training step.</p>
-        <Figure imageKey="plan90Day" />
+        <OverlayFigure
+          imageKey="plan90Day"
+          labels={[
+            { text: "Basic computing, accounts and troubleshooting", left: 2.4, top: 17.6, width: 30.2, height: 9.4 },
+            { text: "Threats, passwords and access controls", left: 35, top: 17.6, width: 29.8, height: 9.4 },
+            { text: "Labs, portfolio and role research", left: 67.3, top: 17.6, width: 30.6, height: 9.4 }
+          ]}
+        />
         <p>
           Be clear about what this plan is: it builds a foundation. It does not guarantee job readiness, employment or
           certification.
