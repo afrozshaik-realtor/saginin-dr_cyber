@@ -10,7 +10,7 @@ const size = { width: 1672, height: 941 } as const;
 export const blogImages = {
   hero: {
     src: `${base}/start-cybersecurity-career-no-it-experience-hero.webp`,
-    alt: "Three career changers from different professions looking toward a future in cybersecurity.",
+    alt: "A healthcare worker in scrubs, a tradesperson in an apron and a professional holding a laptop stand smiling in front of a glowing cybersecurity shield in a modern learning space with a sign reading Cybersecurity Career Education.",
     ...size
   },
   beginnerConfidence: {
