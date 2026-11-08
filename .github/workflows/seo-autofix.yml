@@ -3,7 +3,7 @@
 # SEO_BOT_USER to the token's username (e.g. afrozshaik-realtor).
 # at .github/workflows/seo-autofix.yml
 # Triggered when the SEO bot opens an issue labelled "seo-autofix".
-# Claude Code (Sonnet) implements the tasks -> build + lint must pass -> merged to main -> your host deploys.
+# Claude Code (Sonnet) implements the tasks -> build must pass -> merged into the deploy branch -> your host deploys.
 
 name: SEO autofix
 
@@ -38,10 +38,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       ISSUE: ${{ github.event.issue.number || github.event.inputs.issue }}
       MAX_FILES_CHANGED: 25
+      # Branch your host deploys from. Set repo variable SEO_BASE_BRANCH to override.
+      BASE: ${{ vars.SEO_BASE_BRANCH || 'main' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ vars.SEO_BASE_BRANCH || 'main' }}
 
       - uses: actions/setup-node@v4
         with:
@@ -105,7 +108,7 @@ jobs:
           # Add any build-time env vars your site needs as repo secrets, e.g.:
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
 
-      - name: Merge to main
+      - name: Merge into the deploy branch
         if: steps.guard.outputs.changed != '0'
         run: |
           BR="seo-bot/$(date -u +%F)-$ISSUE"
@@ -115,7 +118,7 @@ jobs:
           git commit -m "SEO: daily fixes (#$ISSUE)"
           git push -u origin "$BR"
           SUMMARY=$(cat .seo-bot/summary.md 2>/dev/null || echo "See issue #$ISSUE")
-          gh pr create --base main --head "$BR" --title "SEO bot fixes - $(date -u +%F)" \
+          gh pr create --base "$BASE" --head "$BR" --title "SEO bot fixes - $(date -u +%F)" \
             --body "Closes #$ISSUE
 
           $SUMMARY"
