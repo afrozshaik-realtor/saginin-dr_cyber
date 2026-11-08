@@ -1,0 +1,132 @@
+# Copy into each Next.js site repo (am-builders-website, the app.drcyber.ca repo)
+# If the repo belongs to a different GitHub account than the bot's token, set repo variable
+# SEO_BOT_USER to the token's username (e.g. afrozshaik-realtor).
+# at .github/workflows/seo-autofix.yml
+# Triggered when the SEO bot opens an issue labelled "seo-autofix".
+# Claude Code (Sonnet) implements the tasks -> build + lint must pass -> merged to main -> your host deploys.
+
+name: SEO autofix
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number to (re)run"
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+concurrency: seo-autofix
+
+jobs:
+  fix:
+    # Only run for issues the bot opened from the owner's account, and only if autopilot is on.
+    if: >
+      vars.SEO_AUTOPILOT != 'false' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (contains(github.event.issue.labels.*.name, 'seo-autofix') &&
+        github.event.issue.user.login == (vars.SEO_BOT_USER || github.repository_owner)))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE: ${{ github.event.issue.number || github.event.inputs.issue }}
+      MAX_FILES_CHANGED: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Load tasks from issue
+        run: |
+          mkdir -p .seo-bot
+          gh issue view "$ISSUE" --json body -q .body > .seo-bot/tasks.md
+          echo ".seo-bot/" >> .git/info/exclude
+
+      - name: Claude Code implements the SEO tasks
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are implementing today's SEO tasks for this Next.js website.
+            Read .seo-bot/tasks.md. It contains the tasks, the exact values to use, and the
+            BUSINESS FACTS block, which lists the only facts you may put on the site.
+
+            Rules:
+            - First study how this repo handles metadata (generateMetadata / metadata exports),
+              routing, sitemap, robots, JSON-LD and existing page components. Follow its patterns.
+            - Use the exact titles, descriptions, headings and JSON-LD given in the tasks.
+            - New pages: build them with the site's existing layout and components, add them to the
+              sitemap and link to them from at least two relevant existing pages.
+            - Never invent prices, reviews, testimonials, licence numbers, awards or statistics.
+              If something needed is missing from BUSINESS FACTS, leave it out.
+            - Do not touch auth, database, API routes, env files, payment/checkout/membership code,
+              file storage (R2/uploads), or package versions. Only public marketing pages and SEO plumbing
+              (metadata, sitemap, robots, JSON-LD, content, internal links, image alt text).
+            - Never index logged-in app screens; keep dashboards and account pages noindex.
+            - Do not run git commands. Only edit files.
+            - When done, run `npm run build` and fix anything you broke until it passes.
+            - Finish by writing .seo-bot/summary.md: one line per task, done or skipped, and why.
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm run build),Bash(npm run lint),Bash(npx next lint)"
+
+      - name: Guardrails
+        id: guard
+        run: |
+          git add -A
+          CHANGED=$(git diff --cached --name-only | wc -l)
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+          if [ "$CHANGED" -eq 0 ]; then echo "No changes."; exit 0; fi
+          if [ "$CHANGED" -gt "$MAX_FILES_CHANGED" ]; then
+            echo "::error::Too many files changed ($CHANGED)"; exit 1; fi
+          if git diff --cached --name-only | grep -E '(^|/)(\.env|package-lock\.json|package\.json|middleware\.|drizzle|supabase|app/api/|pages/api/|auth|stripe|billing|payment|checkout|r2|storage)'; then
+            echo "::error::Bot touched a protected path"; exit 1; fi
+          if git diff --cached --diff-filter=D --name-only | grep .; then
+            echo "::error::Bot deleted files"; exit 1; fi
+
+      - name: Build must pass
+        if: steps.guard.outputs.changed != '0'
+        run: npm run build
+        env:
+          # Add any build-time env vars your site needs as repo secrets, e.g.:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+
+      - name: Merge to main
+        if: steps.guard.outputs.changed != '0'
+        run: |
+          BR="seo-bot/$(date -u +%F)-$ISSUE"
+          git config user.name "seo-bot"
+          git config user.email "seo-bot@users.noreply.github.com"
+          git checkout -b "$BR"
+          git commit -m "SEO: daily fixes (#$ISSUE)"
+          git push -u origin "$BR"
+          SUMMARY=$(cat .seo-bot/summary.md 2>/dev/null || echo "See issue #$ISSUE")
+          gh pr create --base main --head "$BR" --title "SEO bot fixes - $(date -u +%F)" \
+            --body "Closes #$ISSUE
+
+          $SUMMARY"
+          gh pr merge "$BR" --squash --delete-branch
+
+      - name: Report back
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            gh issue comment "$ISSUE" --body "Done. $(cat .seo-bot/summary.md 2>/dev/null)"
+            gh issue close "$ISSUE" || true
+          else
+            gh issue comment "$ISSUE" --body "Autofix stopped (build failed or a guardrail tripped). Nothing was merged. See run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
