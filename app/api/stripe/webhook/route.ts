@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { alertOnFailureBurst } from "@/lib/services/alerts";
 import { fulfillCheckoutSession, revokeOrdersForPaymentIntent } from "@/lib/services/fulfillment";
 import { getStripeClient } from "@/lib/services/stripe";
 
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
+  let sawFailure = false;
   try {
     // Recording the event and doing the work commit together: if the work fails, the event row rolls
     // back too and Stripe's retry processes it again. If two deliveries race, the loser hits the
@@ -67,10 +69,27 @@ export async function POST(request: NextRequest) {
           else console.error("[stripe] dispute without payment_intent", dispute.id);
           break;
         }
-        default:
+        case "payment_intent.payment_failed": {
+          const intent = event.data.object as Stripe.PaymentIntent;
+          const err = intent.last_payment_error;
+          await tx.paymentFailure.create({
+            data: {
+              eventId: event.id,
+              studentId: intent.metadata?.studentId || null,
+              paymentIntentId: intent.id,
+              code: err?.code ?? null,
+              declineCode: err?.decline_code ?? null
+            }
+          });
+          sawFailure = true;
           break;
+        }
+        default:
+          break; // e.g. checkout.session.expired: nothing was granted, so nothing to undo
       }
     });
+    // After the transaction commits: tripwire for bursts of failed payments (card testing).
+    if (sawFailure) await alertOnFailureBurst().catch((e) => console.error("[stripe] alert failed", e));
   } catch (error) {
     if (isDuplicateEventError(error)) return NextResponse.json({ received: true, duplicate: true });
     console.error("[stripe] webhook processing failed", event.id, event.type, error);

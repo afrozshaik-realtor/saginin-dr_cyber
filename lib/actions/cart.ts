@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 import { getCartSlugs, setCartSlugs } from "@/lib/cart";
 import { BUNDLE_SLUG } from "@/lib/config/miniCourses";
 import { prisma } from "@/lib/prisma";
+import { studentIsBlockedForFailures } from "@/lib/services/alerts";
+import { allowRequest, clientIp } from "@/lib/services/rateLimitDb";
+import { verifyTurnstile } from "@/lib/services/turnstile";
 import { getProductsBySlugs, listActiveEntitlementCourseIds } from "@/lib/services/commerce";
 import { createCartCheckoutSession } from "@/lib/services/stripe";
 import { requireStudent } from "@/lib/studentAuth";
@@ -33,8 +36,20 @@ export async function switchToBundleAction() {
   redirect("/cart");
 }
 
-export async function checkoutCartAction() {
+export async function checkoutCartAction(formData: FormData) {
   const student = await requireStudent("/cart");
+
+  // $1 products attract card testing, so: bot challenge, rate limits (per user AND per IP), and a cool-off
+  // for anyone whose recent payments keep failing.
+  const ip = clientIp();
+  if (!(await verifyTurnstile(String(formData.get("cf-turnstile-response") || ""), ip))) redirect("/cart?error=captcha");
+  if (
+    !(await allowRequest(`checkout:user:${student.id}`, 5, 600)) ||
+    !(await allowRequest(`checkout:ip:${ip}`, 10, 600))
+  ) {
+    redirect("/cart?error=rate");
+  }
+  if (await studentIsBlockedForFailures(student.id)) redirect("/cart?error=blocked");
 
   const products = await getProductsBySlugs(getCartSlugs());
   if (products.length === 0) redirect("/cart");

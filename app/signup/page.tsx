@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SubmitButton } from "@/components/SubmitButton";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { turnstileSiteKey } from "@/lib/services/turnstile";
 import { signupAction } from "@/lib/actions/lms";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
@@ -7,7 +10,9 @@ export const metadata = { title: "Create account | Dr Cyber" };
 
 const errors: Record<string, string> = {
   invalid: "Please enter your name, a valid email, and a password of at least 10 characters (both password fields must match).",
-  exists: "An account with that email already exists. Try logging in instead."
+  exists: "An account with that email already exists. Try logging in instead.",
+  rate: "Too many sign-up attempts from this network. Please try again later.",
+  captcha: "Please complete the security check and try again."
 };
 
 export default async function SignupPage({ searchParams }: { searchParams: { redirect?: string; error?: string } }) {
@@ -39,9 +44,10 @@ export default async function SignupPage({ searchParams }: { searchParams: { red
             Confirm password
             <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" type="password" name="confirmPassword" autoComplete="new-password" required minLength={10} maxLength={100} />
           </label>
-          <button className="w-full rounded-md bg-cyan px-5 py-3 font-semibold text-navy hover:bg-mint" type="submit">
+          <TurnstileWidget siteKey={turnstileSiteKey()} />
+          <SubmitButton className="w-full rounded-md bg-cyan px-5 py-3 font-semibold text-navy hover:bg-mint disabled:opacity-60" pendingText="Creating account...">
             Create account
-          </button>
+          </SubmitButton>
         </form>
         <p className="mt-4 text-sm text-slate-600">
           Already have an account? <Link className="font-semibold text-blueglow" href={`/login?redirect=${encodeURIComponent(redirectTo)}`}>Log in</Link>

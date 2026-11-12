@@ -6,6 +6,8 @@ import { findLesson } from "@/lib/config/courses";
 import { sendAssignmentSubmissionEmails, sendPasswordResetEmail } from "@/lib/services/email";
 import { fillFormPdf } from "@/lib/services/pdfForm";
 import { getCartSlugs, setCartSlugs } from "@/lib/cart";
+import { allowRequest, clientIp } from "@/lib/services/rateLimitDb";
+import { verifyTurnstile } from "@/lib/services/turnstile";
 import { BUNDLE_SLUG } from "@/lib/config/miniCourses";
 import { getCourseProduct, hasCourseAccess } from "@/lib/services/commerce";
 import { readUploadedFile, saveGeneratedFile, saveUploadedFile } from "@/lib/services/storage";
@@ -46,6 +48,14 @@ export async function loginAction(formData: FormData) {
   if (!parsed.success) {
     redirect(`/login?error=1&redirect=${encodeURIComponent(redirectTo)}`);
   }
+  // Brute-force protection: per IP and per target email (counted on every attempt, right or wrong).
+  const emailKey = parsed.data.email.trim().toLowerCase();
+  if (
+    !(await allowRequest(`login:ip:${clientIp()}`, 30, 600)) ||
+    !(await allowRequest(`login:email:${emailKey}`, 10, 600))
+  ) {
+    redirect(`/login?error=rate&redirect=${encodeURIComponent(redirectTo)}`);
+  }
 
   const student = await getStudentByEmail(parsed.data.email);
   const valid = student ? await verifyPassword(parsed.data.password, student.passwordHash) : false;
@@ -59,6 +69,13 @@ export async function loginAction(formData: FormData) {
 
 export async function signupAction(formData: FormData) {
   const redirectTo = safeRedirect(formData.get("redirect"));
+  const ip = clientIp();
+  if (!(await allowRequest(`signup:ip:${ip}`, 5, 3600))) {
+    redirect(`/signup?error=rate&redirect=${encodeURIComponent(redirectTo)}`);
+  }
+  if (!(await verifyTurnstile(String(formData.get("cf-turnstile-response") || ""), ip))) {
+    redirect(`/signup?error=captcha&redirect=${encodeURIComponent(redirectTo)}`);
+  }
   const parsed = studentSignupSchema.safeParse({
     name: formData.get("name"),
     email: String(formData.get("email") || "").trim().toLowerCase(),

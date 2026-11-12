@@ -89,6 +89,14 @@ R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** A
 [{ "AllowedOrigins": ["https://app.drcyber.ca", "http://localhost:3000"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
 ```
 
+### Fraud controls ($1 products)
+
+- Turnstile on signup and checkout (`TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`; fails closed in production if the secret is missing).
+- DB-backed rate limits (`lib/services/rateLimitDb.ts`): signup 5/hour per IP, login 30/10min per IP and 10/10min per email, checkout 5/10min per user and 10/10min per IP.
+- `payment_intent.payment_failed` is recorded; 3 failures in an hour pause that student's checkout, and 5 failures in 10 minutes email `ADMIN_NOTIFICATION_EMAIL`.
+- `/admin/orders` shows orders and failed payments; `/admin/access` looks up a student and grants comp access, revokes or restores it.
+- Stripe-side settings to enable by hand: see `docs/STRIPE_RADAR.md`.
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

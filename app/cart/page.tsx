@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SubmitButton } from "@/components/SubmitButton";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { turnstileSiteKey } from "@/lib/services/turnstile";
 import { checkoutCartAction, removeFromCartAction, switchToBundleAction } from "@/lib/actions/cart";
 import { getCartSlugs } from "@/lib/cart";
 import { shouldRecommendBundle } from "@/lib/entitlementPlan";
@@ -13,7 +16,10 @@ export const dynamic = "force-dynamic";
 const messages: Record<string, string> = {
   cancelled: "Checkout was cancelled - your card was not charged.",
   checkout: "We could not start checkout. Please try again.",
-  nothing: "You already own everything in your cart."
+  nothing: "You already own everything in your cart.",
+  captcha: "Please complete the security check and try again.",
+  rate: "Too many checkout attempts. Please wait a few minutes and try again.",
+  blocked: "Checkout is paused for your account because of repeated payment failures. Please try again in an hour or contact support."
 };
 
 export default async function CartPage({ searchParams }: { searchParams: { checkout?: string; error?: string } }) {
@@ -83,10 +89,14 @@ export default async function CartPage({ searchParams }: { searchParams: { check
               <span>Total</span>
               <span>{formatPrice(totalCents, products[0].currency)}</span>
             </div>
-            <form action={checkoutCartAction} className="mt-6">
-              <button className="w-full rounded-md bg-cyan px-5 py-3 font-semibold text-navy shadow-glow hover:bg-mint" type="submit">
+            <form action={checkoutCartAction} className="mt-6 space-y-3">
+              {student ? <TurnstileWidget siteKey={turnstileSiteKey()} /> : null}
+              <SubmitButton
+                className="w-full rounded-md bg-cyan px-5 py-3 font-semibold text-navy shadow-glow hover:bg-mint disabled:opacity-60"
+                pendingText="Taking you to Stripe..."
+              >
                 {student ? "Checkout securely with Stripe" : "Log in to check out"}
-              </button>
+              </SubmitButton>
             </form>
             <p className="mt-2 text-xs text-slate-500">Payment is handled by Stripe. Access unlocks once payment is confirmed.</p>
           </>

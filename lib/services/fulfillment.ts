@@ -53,17 +53,24 @@ export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Se
     console.warn(`[stripe] amount mismatch on ${session.id}: charged ${session.amount_total}, catalog ${expectedCents}`);
   }
 
+  // A refund/dispute for this payment may have been delivered BEFORE this event (webhooks can arrive out of
+  // order). In that case the order is created already refunded/disputed and grants nothing.
+  const pi = paymentIntentId(session.payment_intent);
+  const flag = pi ? await tx.paymentFlag.findUnique({ where: { paymentIntentId: pi } }) : null;
+
   const order = await tx.order.create({
     data: {
       studentId,
       stripeSessionId: session.id,
-      stripePaymentIntentId: paymentIntentId(session.payment_intent),
+      stripePaymentIntentId: pi,
       amountCents: session.amount_total ?? expectedCents,
       currency: session.currency ?? "usd",
-      status: "paid",
+      status: flag ? flag.kind : "paid",
       items: { create: products.map((p) => ({ productId: p.id, unitAmountCents: p.priceCents })) }
     }
   });
+
+  if (flag) return "already_reversed" as const;
 
   const desired = products.flatMap(coursesForProduct);
   const existing = await tx.entitlement.findMany({ where: { studentId } });
@@ -89,7 +96,16 @@ export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Se
  */
 export async function revokeOrdersForPaymentIntent(tx: Tx, paymentIntent: string, newStatus: "refunded" | "disputed") {
   const orders = await tx.order.findMany({ where: { stripePaymentIntentId: paymentIntent } });
-  if (orders.length === 0) return "no_order" as const;
+  if (orders.length === 0) {
+    // The order doesn't exist yet (or this payment isn't ours). Remember it so a later checkout.session.completed
+    // for the same payment is created already reversed. Never downgrade a "disputed" flag to "refunded".
+    await tx.paymentFlag.upsert({
+      where: { paymentIntentId: paymentIntent },
+      create: { paymentIntentId: paymentIntent, kind: newStatus },
+      update: newStatus === "disputed" ? { kind: "disputed" } : {}
+    });
+    return "flagged" as const;
+  }
 
   for (const order of orders) {
     await tx.order.update({ where: { id: order.id }, data: { status: newStatus } });

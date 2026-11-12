@@ -92,6 +92,12 @@ export async function notifyAdmin(lead: FunnelLead) {
   await logEmail(lead.id, "admin-notification", subject, status);
 }
 
+export async function sendAdminAlertEmail(subject: string, text: string) {
+  const settings = appSettings();
+  if (!settings.adminNotificationEmail) return "no-recipient";
+  return sendProviderEmail({ to: settings.adminNotificationEmail, subject, text, html: text.replaceAll("\n", "<br />") });
+}
+
 export async function enqueueNurtureSequence(lead: FunnelLead) {
   for (const item of emailSequence) {
     await logEmail(

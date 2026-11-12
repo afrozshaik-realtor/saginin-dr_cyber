@@ -329,6 +329,8 @@ model Entitlement {
   courseId      String    @map("course_id")
   sourceOrderId String?   @map("source_order_id")
   status        String    @default("active")
+  source        String    @default("purchase") // purchase | comp (admin-granted)
+  note          String?
   grantedAt     DateTime  @default(now()) @map("granted_at")
   revokedAt     DateTime? @map("revoked_at")
   student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -405,4 +407,44 @@ model PointsLedger {
   @@unique([studentId, lessonId, reason])
   @@index([studentId])
   @@map("points_ledger")
+}
+
+// ---------------------------------------------------------------------------
+// Fraud controls
+// ---------------------------------------------------------------------------
+
+/// Sliding-window rate limiting that survives restarts and works across processes.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
+
+/// One row per failed payment (Stripe payment_intent.payment_failed). Drives burst alerts and
+/// blocks checkout for a student who keeps failing (card testing).
+model PaymentFailure {
+  id              String   @id @default(cuid())
+  eventId         String?  @unique @map("event_id")
+  studentId       String?  @map("student_id")
+  paymentIntentId String?  @map("payment_intent_id")
+  code            String?
+  declineCode     String?  @map("decline_code")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([studentId, createdAt])
+  @@index([createdAt])
+  @@map("payment_failures")
+}
+
+/// A refund/dispute that arrived BEFORE its order existed (webhooks can be out of order).
+/// When the order is created later it is born refunded/disputed and grants nothing.
+model PaymentFlag {
+  paymentIntentId String   @id @map("payment_intent_id")
+  kind            String // refunded | disputed
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("payment_flags")
 }

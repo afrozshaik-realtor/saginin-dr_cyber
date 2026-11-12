@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import Stripe from "stripe";
 
 let cachedClient: Stripe | null | undefined;
@@ -43,6 +44,12 @@ export async function createCartCheckoutSession({
   if (!stripe) return null;
 
   const productIds = lines.map((line) => line.productId).join(",");
+  // Double-click protection: the same student + same cart within the same minute gets the SAME Checkout Session
+  // back from Stripe instead of a second one.
+  const minuteBucket = Math.floor(Date.now() / 60_000);
+  const idempotencyKey = createHash("sha256")
+    .update(`${studentId}|${[...lines.map((l) => l.productId)].sort().join(",")}|${minuteBucket}`)
+    .digest("hex");
   return stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: studentEmail,
@@ -51,6 +58,9 @@ export async function createCartCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata: { studentId, productIds },
-    payment_intent_data: { metadata: { studentId, productIds } }
-  });
+    payment_intent_data: { metadata: { studentId, productIds } },
+    // Abandoned checkouts expire after 30 minutes (Stripe's minimum). Nothing is granted until payment, so there is nothing to clean up.
+    // Derived from the minute bucket (not the clock) so a double-click sends identical parameters under the same idempotency key.
+    expires_at: minuteBucket * 60 + 32 * 60
+  }, { idempotencyKey });
 }

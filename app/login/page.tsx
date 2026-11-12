@@ -31,6 +31,8 @@ export default function LoginPage({
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
             That link has expired. Log in below, or use &quot;Forgot password?&quot; if needed.
           </p>
+        ) : searchParams.error === "rate" ? (
+          <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Too many attempts. Please wait 10 minutes and try again.</p>
         ) : searchParams.error ? (
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Invalid email or password.</p>
         ) : null}
