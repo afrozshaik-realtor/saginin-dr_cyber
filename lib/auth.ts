@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { createHmac, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { getAdminUserByEmail } from "@/lib/store";
 
@@ -25,24 +26,49 @@ export function hashAdminPassword(password: string) {
   return bcrypt.hash(password, 12);
 }
 
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
+
+/**
+ * The admin cookie used to be the literal string "authenticated", which anyone could set by hand.
+ * It is now "<expiry>.<hmac>", signed with ADMIN_SESSION_SECRET. In production the secret is mandatory.
+ */
+function adminSecret() {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (secret && secret !== "replace-with-a-long-random-secret") return secret;
+  if (process.env.NODE_ENV !== "production") return "dev-admin-secret-change-me";
+  return null;
+}
+
+function signAdmin(expiry: string, secret: string) {
+  return createHmac("sha256", secret).update(`admin:${expiry}`).digest("hex");
+}
+
 export function setAdminSession() {
-  cookies().set(cookieName, "authenticated", {
+  const secret = adminSecret();
+  if (!secret) throw new Error("ADMIN_SESSION_SECRET must be set to a long random value in production");
+  const expiry = String(Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000);
+  cookies().set(cookieName, `${expiry}.${signAdmin(expiry, secret)}`, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 8,
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
     path: "/"
   });
 }
 
-export function requireAdmin() {
-  if (cookies().get(cookieName)?.value !== "authenticated") {
-    redirect("/admin/login");
-  }
+export function isAdminSession() {
+  const secret = adminSecret();
+  const value = cookies().get(cookieName)?.value;
+  if (!secret || !value) return false;
+  const [expiry, signature] = value.split(".");
+  if (!expiry || !signature || !/^\d+$/.test(expiry) || Date.now() > Number(expiry)) return false;
+  const expected = Buffer.from(signAdmin(expiry, secret));
+  const provided = Buffer.from(signature);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
 }
 
-export function isAdminSession() {
-  return cookies().get(cookieName)?.value === "authenticated";
+export function requireAdmin() {
+  if (!isAdminSession()) redirect("/admin/login");
 }
 
 export function clearAdminSession() {
