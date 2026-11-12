@@ -11,10 +11,10 @@ import { readUploadedFile } from "@/lib/services/storage";
 import {
   getAssignmentSubmission,
   getCourseBySlug,
-  getEnrollment,
   getLatestQuizAttempt,
   getLessonProgressMap
 } from "@/lib/store";
+import { hasCourseAccess } from "@/lib/services/commerce";
 import { requireStudent } from "@/lib/studentAuth";
 
 const kindLabels: Record<string, string> = {
@@ -36,8 +36,7 @@ export default async function LearnPage({
   if (!course) notFound();
 
   const student = await requireStudent(`/learn/${params.slug}`);
-  const enrollment = await getEnrollment(student.id, course!.id);
-  if (!enrollment) redirect(`/courses/${params.slug}`);
+  if (!(await hasCourseAccess(student.id, course!.id))) redirect(`/courses/${params.slug}`);
 
   const progressMap = await getLessonProgressMap(student.id, course!.id);
   const flatLessons = listLessonsFlat(course!);

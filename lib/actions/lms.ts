@@ -5,13 +5,15 @@ import { revalidatePath } from "next/cache";
 import { findLesson } from "@/lib/config/courses";
 import { sendAssignmentSubmissionEmails, sendPasswordResetEmail } from "@/lib/services/email";
 import { fillFormPdf } from "@/lib/services/pdfForm";
-import { createCheckoutSession } from "@/lib/services/stripe";
+import { getCartSlugs, setCartSlugs } from "@/lib/cart";
+import { BUNDLE_SLUG } from "@/lib/config/miniCourses";
+import { getCourseProduct, hasCourseAccess } from "@/lib/services/commerce";
 import { readUploadedFile, saveGeneratedFile, saveUploadedFile } from "@/lib/services/storage";
 import {
   createAssignmentSubmission,
+  createStudent,
   enrollStudent,
   getCourseBySlug,
-  getEnrollment,
   getStudentByEmail,
   getStudentById,
   recordQuizAttempt,
@@ -28,7 +30,7 @@ import {
   verifyPassword,
   verifyPasswordResetToken
 } from "@/lib/studentAuth";
-import { forgotPasswordSchema, resetPasswordSchema, studentLoginSchema } from "@/lib/validation";
+import { forgotPasswordSchema, resetPasswordSchema, studentLoginSchema, studentSignupSchema } from "@/lib/validation";
 
 function safeRedirect(target: FormDataEntryValue | null) {
   const value = typeof target === "string" ? target : "";
@@ -51,6 +53,23 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=1&redirect=${encodeURIComponent(redirectTo)}`);
   }
 
+  setStudentSession(student!.id);
+  redirect(redirectTo);
+}
+
+export async function signupAction(formData: FormData) {
+  const redirectTo = safeRedirect(formData.get("redirect"));
+  const parsed = studentSignupSchema.safeParse({
+    name: formData.get("name"),
+    email: String(formData.get("email") || "").trim().toLowerCase(),
+    password: formData.get("password")
+  });
+  if (!parsed.success || parsed.data.password !== String(formData.get("confirmPassword") || "")) {
+    redirect(`/signup?error=invalid&redirect=${encodeURIComponent(redirectTo)}`);
+  }
+  const passwordHash = await hashPassword(parsed.data.password);
+  const student = await createStudent({ name: parsed.data.name, email: parsed.data.email, passwordHash });
+  if (!student) redirect(`/signup?error=exists&redirect=${encodeURIComponent(redirectTo)}`);
   setStudentSession(student!.id);
   redirect(redirectTo);
 }
@@ -108,8 +127,7 @@ export async function checkoutAction(formData: FormData) {
     redirect(`/login?redirect=${encodeURIComponent(`/courses/${slug}`)}`);
   }
 
-  const existing = await getEnrollment(student!.id, course!.id);
-  if (existing) redirect(`/learn/${slug}`);
+  if (await hasCourseAccess(student!.id, course!.id)) redirect(`/learn/${slug}`);
 
   if (course!.priceCents === 0) {
     // Free course - skip Stripe entirely. A $0 line item isn't something Stripe Checkout supports.
@@ -121,31 +139,12 @@ export async function checkoutAction(formData: FormData) {
     redirect(`/learn/${slug}`);
   }
 
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
-  let session: Awaited<ReturnType<typeof createCheckoutSession>> = null;
-  try {
-    session = await createCheckoutSession({
-      studentId: student!.id,
-      studentEmail: student!.email,
-      course: course!,
-      successUrl: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&slug=${slug}`,
-      cancelUrl: `${appUrl}/courses/${slug}?checkout=cancelled`
-    });
-  } catch (error) {
-    console.error("Stripe checkout session creation failed", error);
-    redirect(`/courses/${slug}?checkout=error`);
-  }
-
-  if (!session) {
-    // Stripe isn't configured (no STRIPE_SECRET_KEY) - enroll directly so the app stays testable end-to-end locally.
-    await enrollStudent(student!.id, course!.id, { paymentStatus: "dev-mode" });
-    redirect(`/learn/${slug}`);
-  }
-  if (!session.url) {
-    redirect(`/courses/${slug}?checkout=error`);
-  }
-
-  redirect(session.url);
+  // Paid courses go through the cart + hosted Checkout (lib/actions/cart.ts). Access is granted only by the
+  // verified Stripe webhook - never from here, and there is no free "dev-mode" fallback any more.
+  const product = await getCourseProduct(course!.id);
+  if (!product) redirect(`/courses/${slug}?checkout=error`);
+  setCartSlugs(getCartSlugs().filter((s) => s !== BUNDLE_SLUG).concat(product!.slug));
+  redirect("/cart");
 }
 
 export async function toggleLessonAction(formData: FormData) {

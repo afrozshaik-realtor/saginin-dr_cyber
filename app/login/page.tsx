@@ -38,7 +38,10 @@ export default function LoginPage({
           Log in
         </button>
         <p className="mt-4 text-center text-sm text-slate-600">
-          Student accounts are set up by an admin - check your email for an invite link.
+          New here?{" "}
+          <Link className="font-semibold text-blueglow" href={`/signup?redirect=${encodeURIComponent(redirectTo)}`}>
+            Create an account
+          </Link>
         </p>
       </form>
     </main>

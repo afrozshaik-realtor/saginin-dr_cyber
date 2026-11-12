@@ -136,6 +136,8 @@ model Student {
   createdAt      DateTime         @default(now()) @map("created_at")
   enrollments    Enrollment[]
   lessonProgress LessonProgress[]
+  orders         Order[]
+  entitlements   Entitlement[]
 
   @@map("students")
 }
@@ -174,22 +176,27 @@ model LessonProgress {
 /// Course content is managed from /admin/courses, not migrated by hand - a normalized relational
 /// schema can replace this later if the catalog grows large enough to need querying into lessons.
 model Course {
-  id            String   @id @default(cuid())
-  slug          String   @unique
-  pathwayId     String?  @map("pathway_id")
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  pathwayId     String?        @map("pathway_id")
   title         String
   category      String
   level         String
-  summary       String   @db.Text
-  description   String   @db.Text
+  summary       String         @db.Text
+  description   String         @db.Text
   certification String?
   image         String
-  priceCents    Int      @map("price_cents")
+  priceCents    Int            @map("price_cents")
   currency      String
-  published     Boolean  @default(true)
-  modulesJson   Json     @map("modules_json")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  published     Boolean        @default(true)
+  sortOrder     Int            @default(0) @map("sort_order")
+  modulesJson   Json           @map("modules_json")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  lessons       CourseLesson[]
+  products      Product[]
+  bundleItems   BundleItem[]
+  entitlements  Entitlement[]
 
   @@map("courses")
 }
@@ -226,4 +233,112 @@ model AssignmentSubmission {
 
   @@unique([studentId, lessonId])
   @@map("assignment_submissions")
+}
+
+// ---------------------------------------------------------------------------
+// Course sales (Stripe) + entitlements
+// ---------------------------------------------------------------------------
+
+/// Video lessons for the paid mini-courses. `r2Key` is the object key in the PRIVATE R2 bucket
+/// (never a URL). Legacy pathway courses keep their lessons in courses.modules_json instead.
+model CourseLesson {
+  id              String   @id @default(cuid())
+  courseId        String   @map("course_id")
+  sortOrder       Int      @default(0) @map("sort_order")
+  title           String
+  r2Key           String?  @map("r2_key")
+  durationSeconds Int      @default(0) @map("duration_seconds")
+  createdAt       DateTime @default(now()) @map("created_at")
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, sortOrder])
+  @@map("lessons")
+}
+
+/// Something sellable. type "course" -> courseId is set. type "bundle" -> the courses are listed in bundle_items.
+/// Prices are ALWAYS read from this table on the server, never from the client.
+model Product {
+  id              String       @id @default(cuid())
+  type            String // "course" | "bundle"
+  slug            String       @unique
+  title           String
+  courseId        String?      @unique @map("course_id")
+  priceCents      Int          @map("price_cents")
+  currency        String       @default("usd")
+  stripeProductId String?      @map("stripe_product_id")
+  stripePriceId   String?      @map("stripe_price_id")
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  course          Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  bundleItems     BundleItem[]
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model BundleItem {
+  productId String  @map("product_id")
+  courseId  String  @map("course_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([productId, courseId])
+  @@map("bundle_items")
+}
+
+/// Created ONLY by the verified Stripe webhook. status: paid | refunded | disputed
+model Order {
+  id                    String        @id @default(cuid())
+  studentId             String        @map("student_id")
+  stripeSessionId       String        @unique @map("stripe_session_id")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  amountCents           Int           @map("amount_cents")
+  currency              String
+  status                String        @default("paid")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  student               Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  items                 OrderItem[]
+  entitlements          Entitlement[]
+
+  @@index([stripePaymentIntentId])
+  @@index([studentId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String  @map("order_id")
+  productId       String  @map("product_id")
+  unitAmountCents Int     @map("unit_amount_cents")
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+/// The single source of truth for "can this student open this paid course". status: active | revoked
+model Entitlement {
+  id            String    @id @default(cuid())
+  studentId     String    @map("student_id")
+  courseId      String    @map("course_id")
+  sourceOrderId String?   @map("source_order_id")
+  status        String    @default("active")
+  grantedAt     DateTime  @default(now()) @map("granted_at")
+  revokedAt     DateTime? @map("revoked_at")
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceOrder   Order?    @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, courseId])
+  @@index([sourceOrderId])
+  @@map("entitlements")
+}
+
+/// Webhook idempotency: one row per processed Stripe event id.
+model StripeEvent {
+  eventId     String   @id @map("event_id")
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("stripe_events")
 }

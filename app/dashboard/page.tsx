@@ -2,12 +2,20 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
+import { listActiveEntitlementCourseIds } from "@/lib/services/commerce";
 import { getCourseById, getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
 import { requireStudent } from "@/lib/studentAuth";
 
 export default async function DashboardPage() {
   const student = await requireStudent("/dashboard");
-  const enrollments = await listEnrollmentsForStudent(student.id);
+  const legacyEnrollments = await listEnrollmentsForStudent(student.id);
+  const entitledIds = await listActiveEntitlementCourseIds(student.id);
+  const enrollments = [
+    ...legacyEnrollments,
+    ...entitledIds
+      .filter((courseId) => !legacyEnrollments.some((e) => e.courseId === courseId))
+      .map((courseId) => ({ courseId, paymentStatus: "paid" as const, amountPaidCents: undefined, currency: undefined }))
+  ];
 
   const enrolledCourses = await Promise.all(
     enrollments.map(async (enrollment) => {

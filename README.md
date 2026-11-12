@@ -61,6 +61,20 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`) for the seeded catalog; change a course's price any time from `/admin/courses/[id]`.
 - **Free courses**: check "This course is free" when creating/editing a course in `/admin/courses` (locks the price to 0). Enrolling in a $0 course skips Stripe entirely and enrolls the student directly (marked `free`) - Stripe Checkout doesn't support $0 line items, so this isn't just a UI nicety, it avoids a real checkout failure.
 
+### Course sales: cart, Checkout, webhook, entitlements (mini-courses)
+
+- Catalog: 12 mini-courses ($1) + an all-courses bundle ($9) as rows in `products` / `bundle_items`. Seed with `STRIPE_SECRET_KEY=sk_test_... npm run seed:catalog` (also creates Stripe test Products/Prices; refuses live keys). Course titles are placeholders - rename them in `/admin/courses`.
+- `/cart` holds product slugs in a cookie; prices are always read from the DB. One Checkout Session covers the whole cart. The bundle is recommended when the cart holds every course or costs more than the bundle.
+- Access is granted ONLY by `POST /api/stripe/webhook` (signature-verified on the raw body, idempotent via `stripe_events`): `checkout.session.completed`, `checkout.session.async_payment_succeeded` create the order + `entitlements`; a full `charge.refunded` or `charge.dispute.created` revokes them. `/api/webhooks/stripe` is kept as an alias.
+- `/checkout/success` only polls `/api/checkout/status` (read-only).
+- Run `npm test` (set `DATABASE_URL` to a scratch MySQL to include the webhook integration tests).
+
+Local webhook testing:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

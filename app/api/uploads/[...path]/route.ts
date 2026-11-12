@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminSession } from "@/lib/auth";
-import { getAssignmentSubmissionByFileUrl, getEnrollment } from "@/lib/store";
+import { getAssignmentSubmissionByFileUrl } from "@/lib/store";
+import { hasCourseAccess } from "@/lib/services/commerce";
 import { readUploadedFile } from "@/lib/services/storage";
 import { getStudentSessionId } from "@/lib/studentAuth";
 
@@ -38,8 +39,8 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
   if (relativePath.startsWith("lesson-resources/") || relativePath.startsWith("assignment-templates/")) {
     if (isAdmin) return serveFile(relativePath, fileName);
     const courseId = relativePath.split("/")[1];
-    const enrollment = studentId && courseId ? await getEnrollment(studentId, courseId) : null;
-    if (!enrollment) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const allowed = studentId && courseId ? await hasCourseAccess(studentId, courseId) : false;
+    if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     return serveFile(relativePath, fileName);
   }
 

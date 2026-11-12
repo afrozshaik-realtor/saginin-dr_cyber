@@ -3,7 +3,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { checkoutAction } from "@/lib/actions/lms";
 import { getLessonCount, getTotalDuration } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
-import { getCourseBySlug, getEnrollment } from "@/lib/store";
+import { hasCourseAccess } from "@/lib/services/commerce";
+import { getCourseBySlug } from "@/lib/store";
 import { getCurrentStudent } from "@/lib/studentAuth";
 
 const kindLabels: Record<string, string> = {
@@ -35,7 +36,7 @@ export default async function CourseDetailPage({
   if (!course) notFound();
 
   const student = await getCurrentStudent();
-  const enrollment = student ? await getEnrollment(student.id, course!.id) : null;
+  const enrollment = student ? await hasCourseAccess(student.id, course!.id) : false;
   const lessonCount = getLessonCount(course!);
   const hours = Math.round((getTotalDuration(course!) / 60) * 10) / 10;
   const isFree = course!.priceCents === 0;
@@ -76,13 +77,13 @@ export default async function CourseDetailPage({
                     className="focus-ring inline-flex items-center justify-center rounded-md bg-cyan px-5 py-3 text-sm font-semibold text-navy shadow-glow hover:bg-mint"
                     type="submit"
                   >
-                    {isFree ? "Enroll for free" : `Enroll - ${price}`}
+                    {isFree ? "Enroll for free" : `Add to cart - ${price}`}
                   </button>
                 </form>
               )}
               {!enrollment ? (
                 <span className="text-sm text-slate-300">
-                  {isFree ? "No payment required" : "One-time payment - lifetime access"}
+                  {isFree ? "No payment required" : "One-time payment - lifetime access (or get all courses in the bundle)"}
                 </span>
               ) : null}
             </div>
