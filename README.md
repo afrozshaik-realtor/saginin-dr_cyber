@@ -75,6 +75,20 @@ Local webhook testing:
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
+### Protected video (Cloudflare R2), progress and points
+
+- Videos live in a **private** R2 bucket and are never public. `POST /api/lessons/[id]/play` checks the session and an active entitlement, then returns a presigned GET URL valid for 1 hour (403 otherwise, including for unknown ids). The browser streams straight from R2 (Range/seeking works), so video never passes through the Node app.
+- Admin: `/admin/courses/[id]/videos` uploads a video directly to R2 with a presigned PUT, then attaches it to a lesson (`lessons` table, key under `videos/<courseId>/`).
+- The player (`components/VideoPlayer.tsx`) shows a faint moving watermark with the student's email and refreshes an expired link automatically.
+- Progress: the client sends its playhead position every 15s. The server only lets validated progress advance at real-time speed (max 2x), so seeking to the end can't fake it. At 90% validated, points are written once to `points_ledger` (unique per student + lesson).
+- Limits: max 2 concurrent playback sessions per student, max 10 new links per minute.
+
+R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** API token (Object Read & Write, this bucket only), set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, and add a CORS rule on the bucket so the admin upload works:
+
+```json
+[{ "AllowedOrigins": ["https://app.drcyber.ca", "http://localhost:3000"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+```
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

@@ -61,7 +61,7 @@ function joinPath(folder: string, name: string) {
 }
 
 /** Signed request to R2's S3-compatible API. */
-async function r2Request(method: "PUT" | "GET", key: string, body?: Buffer) {
+async function r2Request(method: "PUT" | "GET" | "HEAD", key: string, body?: Buffer) {
     assertConfigured();
 
   const now = new Date();
@@ -170,4 +170,72 @@ export async function readUploadedFile(relativePath: string): Promise<Buffer> {
     }
     const arrayBuffer = await res.arrayBuffer();
     return Buffer.from(arrayBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// Presigned URLs (private bucket). The URL itself carries the signature, so the browser talks to R2
+// directly - video bytes never pass through the app server.
+// ---------------------------------------------------------------------------
+
+function rfc3986(value: string) {
+    return encodeURIComponent(value).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+/** R2 object keys we generate only ever use these characters. Anything else is refused. */
+export function isSafeObjectKey(key: string) {
+    return /^[A-Za-z0-9][A-Za-z0-9._\/-]{0,300}$/.test(key) && !key.includes("..") && !key.includes("//");
+}
+
+export function presignObjectUrl(
+    method: "GET" | "PUT",
+    key: string,
+    expiresInSeconds: number,
+    options: { now?: Date; query?: Record<string, string> } = {}
+) {
+    assertConfigured();
+    if (!isSafeObjectKey(key)) throw new Error("Unsafe object key");
+    if (expiresInSeconds < 1 || expiresInSeconds > 604800) throw new Error("Invalid expiry");
+
+    const now = options.now ?? new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = amzDate.slice(0, 8);
+    const host = `${ACCOUNT_ID}.r2.cloudflarestorage.com`;
+    const credentialScope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
+    const canonicalUri = `/${BUCKET}/${key.split("/").map(rfc3986).join("/")}`;
+
+    const params: Record<string, string> = {
+        "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+        "X-Amz-Credential": `${ACCESS_KEY_ID}/${credentialScope}`,
+        "X-Amz-Date": amzDate,
+        "X-Amz-Expires": String(Math.floor(expiresInSeconds)),
+        "X-Amz-SignedHeaders": "host",
+        ...(options.query ?? {})
+    };
+    const canonicalQuery = Object.keys(params)
+        .sort()
+        .map((k) => `${rfc3986(k)}=${rfc3986(params[k])}`)
+        .join("&");
+
+    const canonicalRequest = [
+        method,
+        canonicalUri,
+        canonicalQuery,
+        `host:${host}\n`,
+        "host",
+        "UNSIGNED-PAYLOAD"
+    ].join("\n");
+    const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, sha256Hex(canonicalRequest)].join("\n");
+    const signature = hmac(getSigningKey(dateStamp), stringToSign).toString("hex");
+
+    return {
+        url: `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`,
+        expiresAt: new Date(now.getTime() + expiresInSeconds * 1000)
+    };
+}
+
+/** True if the object exists in the bucket (server-side signed HEAD). */
+export async function objectExists(key: string) {
+    if (!isSafeObjectKey(key)) return false;
+    const res = await r2Request("HEAD", key);
+    return res.ok;
 }

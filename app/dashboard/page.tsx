@@ -4,10 +4,13 @@ import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
 import { listActiveEntitlementCourseIds } from "@/lib/services/commerce";
 import { getCourseById, getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
+import { prisma } from "@/lib/prisma";
+import { getTotalPoints } from "@/lib/services/playback";
 import { requireStudent } from "@/lib/studentAuth";
 
 export default async function DashboardPage() {
   const student = await requireStudent("/dashboard");
+  const totalPoints = await getTotalPoints(student.id);
   const legacyEnrollments = await listEnrollmentsForStudent(student.id);
   const entitledIds = await listActiveEntitlementCourseIds(student.id);
   const enrollments = [
@@ -21,9 +24,12 @@ export default async function DashboardPage() {
     enrollments.map(async (enrollment) => {
       const course = await getCourseById(enrollment.courseId);
       if (!course) return null;
-      const progressMap = await getLessonProgressMap(student.id, course.id);
-      const totalLessons = getLessonCount(course);
-      const completedLessons = Object.values(progressMap).filter(Boolean).length;
+      const videoLessonCount = await prisma.courseLesson.count({ where: { courseId: course.id } });
+      const totalLessons = videoLessonCount > 0 ? videoLessonCount : getLessonCount(course);
+      const completedLessons =
+        videoLessonCount > 0
+          ? await prisma.watchProgress.count({ where: { studentId: student.id, courseId: course.id, completedAt: { not: null } } })
+          : Object.values(await getLessonProgressMap(student.id, course.id)).filter(Boolean).length;
       const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
       const paidLabel =
         enrollment.paymentStatus === "paid" && enrollment.amountPaidCents
@@ -46,7 +52,7 @@ export default async function DashboardPage() {
       <SiteHeader student={student} />
       <section className="mx-auto max-w-6xl px-6 py-10 lg:px-8">
         <h1 className="text-3xl font-bold">My Learning</h1>
-        <p className="mt-2 text-slate-600">Welcome back, {student.name}.</p>
+        <p className="mt-2 text-slate-600">Welcome back, {student.name}. You have {totalPoints} points.</p>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {active.map(({ course, completedLessons, totalLessons, percent, paidLabel }) => (

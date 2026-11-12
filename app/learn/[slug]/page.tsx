@@ -2,6 +2,9 @@ import { clsx } from "clsx";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PdfFormFiller } from "@/components/PdfFormFiller";
+import { VideoCourseView } from "@/components/VideoCourseView";
+import { prisma } from "@/lib/prisma";
+import { getTotalPoints } from "@/lib/services/playback";
 import { SiteHeader } from "@/components/SiteHeader";
 import { submitAssignmentAction, submitQuizAction, toggleLessonAction } from "@/lib/actions/lms";
 import { findLesson, listLessonsFlat } from "@/lib/config/courses";
@@ -37,6 +40,40 @@ export default async function LearnPage({
 
   const student = await requireStudent(`/learn/${params.slug}`);
   if (!(await hasCourseAccess(student.id, course!.id))) redirect(`/courses/${params.slug}`);
+
+  // Mini-courses keep their (protected R2 video) lessons in the `lessons` table.
+  const videoLessons = await prisma.courseLesson.findMany({ where: { courseId: course!.id }, orderBy: { sortOrder: "asc" } });
+  if (videoLessons.length > 0) {
+    const [watched, totalPoints] = await Promise.all([
+      prisma.watchProgress.findMany({ where: { studentId: student.id, courseId: course!.id } }),
+      getTotalPoints(student.id)
+    ]);
+    const rows = videoLessons.map((l) => {
+      const w = watched.find((x) => x.lessonId === l.id);
+      return {
+        id: l.id,
+        title: l.title,
+        durationSeconds: l.durationSeconds,
+        points: l.points,
+        percent: w?.percent ?? 0,
+        completed: Boolean(w?.completedAt)
+      };
+    });
+    const activeId = rows.find((r) => r.id === searchParams.lesson)?.id ?? rows.find((r) => !r.completed)?.id ?? rows[0].id;
+    return (
+      <main className="min-h-screen bg-cloud">
+        <SiteHeader student={student} />
+        <VideoCourseView
+          slug={params.slug}
+          courseTitle={course!.title}
+          lessons={rows}
+          activeId={activeId}
+          watermark={student.email}
+          totalPoints={totalPoints}
+        />
+      </main>
+    );
+  }
 
   const progressMap = await getLessonProgressMap(student.id, course!.id);
   const flatLessons = listLessonsFlat(course!);
