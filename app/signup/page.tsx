@@ -50,6 +50,10 @@ export default async function SignupPage({ searchParams }: { searchParams: { red
             <input className="mt-1" type="checkbox" name="emailConsent" />
             <span>{MARKETING_CONSENT_TEXT}</span>
           </label>
+          <p className="text-xs text-slate-500">
+            By creating an account you agree to our <Link className="underline" href="/terms">Terms</Link> and{" "}
+            <Link className="underline" href="/privacy">Privacy Policy</Link>.
+          </p>
           <TurnstileWidget siteKey={turnstileSiteKey()} />
           <SubmitButton className="w-full rounded-md bg-cyan px-5 py-3 font-semibold text-navy hover:bg-mint disabled:opacity-60" pendingText="Creating account...">
             Create account

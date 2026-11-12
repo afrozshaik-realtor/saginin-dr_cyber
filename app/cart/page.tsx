@@ -98,7 +98,10 @@ export default async function CartPage({ searchParams }: { searchParams: { check
                 {student ? "Checkout securely with Stripe" : "Log in to check out"}
               </SubmitButton>
             </form>
-            <p className="mt-2 text-xs text-slate-500">Payment is handled by Stripe. Access unlocks once payment is confirmed.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Payment is handled by Stripe. Access unlocks once payment is confirmed. By paying you agree to our{" "}
+              <Link className="underline" href="/terms">Terms</Link> and <Link className="underline" href="/refunds">Refund Policy</Link>.
+            </p>
           </>
         )}
       </section>

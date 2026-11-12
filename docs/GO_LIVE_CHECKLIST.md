@@ -16,7 +16,7 @@ Legend: **YOU** = needs your accounts or a decision. **APP** = already in the co
       In production the built-in `admin@example.com / ChangeMe123!` login is disabled.
       Generate a hash: `node -e "console.log(require('bcryptjs').hashSync(process.argv[1],12))" 'your-long-password'`
 - [ ] **[BLOCKER] Leave `ALLOW_ADMIN_REGISTER=false`.** If it were open, anyone could create the first admin account.
-- [ ] **[BLOCKER] Terms, Privacy and Refund pages do not exist yet** (section 9).
+- [ ] **[BLOCKER] Terms, Privacy and Refund pages exist as UNREVIEWED DRAFTS** at `/terms`, `/privacy`, `/refunds`. Fill in the business details, decide the refund window, get a lawyer to review, then clear the draft banner (section 9).
 - [ ] **[BLOCKER] The 12 course titles are placeholders** ("Mini-Course 01 (rename me)") and have no videos (section 3).
 - [ ] **The admin area has no MFA** (section 11). Decide how you will protect it before launch.
 
@@ -91,14 +91,16 @@ Do all of this in the Stripe Dashboard with **test mode OFF**. Never paste live 
 - [ ] **[BLOCKER]** Without the secret, signup and checkout **refuse to work in production** (by design). Never ship Cloudflare's test keys.
 - [ ] Test signup and checkout in a real browser, including a phone.
 
-## 9. Legal pages (not in the app yet)
-- [ ] **YOU / a lawyer** Write and publish **Terms of Service**, **Privacy Policy** and **Refund Policy**. I did not write legal text for you.
-- [ ] Link them in the site header/footer, on the signup form and on the cart page. Tell me the URLs or the text and I will add the pages and links.
-- [ ] Refund policy must match what you will actually do: the app revokes access on a **full** refund or a dispute; a **partial** refund does not revoke anything.
-- [ ] Privacy policy should cover what the app stores: name, email, password hash, order history, watch progress, points, marketing consent record, rate-limit keys that contain IP addresses, and the services involved
-      (Stripe, Cloudflare Turnstile and R2, Calendly, your email provider, Hostinger).
-- [ ] Canadian marketing-email rules (CASL): consent is a separate unchecked box with stored wording and timestamp; promotional email carries your address and an unsubscribe link. Have the wording reviewed.
-- [ ] The site sets only essential cookies (student session, cart, admin session). Confirm with your lawyer whether a cookie notice is needed.
+## 9. Legal pages (drafts are in the app, not reviewed)
+`/terms`, `/privacy` and `/refunds` are live in the app, linked from the footer, the signup form and the cart. The text was **drafted from what the app really does**; it is **not legal advice** and has **not** been reviewed by a lawyer. A yellow "Draft - not yet reviewed" banner shows on each page until you clear it.
+- [ ] **YOU** Set in production: `BUSINESS_LEGAL_NAME`, `BUSINESS_ADDRESS`, `SUPPORT_EMAIL`, `LEGAL_GOVERNING_PROVINCE`. Anything unset shows as a visible `[PLACEHOLDER]` on the page.
+- [ ] **YOU** Decide the refund window and set `REFUND_WINDOW_DAYS` (default **7**, which I chose, so it is *your* call). The Refund page promises this to customers; honor it.
+- [ ] **YOU / a lawyer** Review all three pages (wording lives in `lib/config/legal.ts`). Points to check specifically:
+      the 16+ age limit, governing law, the liability cap, "points may be removed on refund" (the app does **not** remove points automatically), the data-retention wording, and CASL consent wording.
+- [ ] After review set `LEGAL_PAGES_REVIEWED=true` to remove the draft banner. Do not set it before.
+- [ ] The Refund page matches the app: a **full** refund or a dispute switches access off; a **partial** refund does not. If you give partial refunds, tell customers access stays.
+- [ ] Re-read the Privacy page against what you actually use (it names Stripe, Cloudflare, Hostinger, your email provider and your booking provider). Update it if you add tools.
+- [ ] The site sets only essential cookies (student session, cart, admin session; Turnstile/Stripe may set their own). Confirm with your lawyer whether a cookie notice is needed.
 
 ## 10. Tax
 - [ ] **YOU + your accountant** Sales tax / GST / HST on USD digital sales is **not handled by the app and not confirmed**. The app charges exactly $1 / $9 with no tax added.
