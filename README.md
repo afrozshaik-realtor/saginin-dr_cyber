@@ -107,6 +107,10 @@ R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** A
 - Email goes through the `EmailSender` interface in `lib/services/transactional.ts` (today it delegates to the existing console/Resend sender; add a provider by implementing the interface). Welcome and receipt emails are transactional. The 1x1 invitation is promotional, so it is sent **only to students with recorded consent** (CASL), at most once, with your `BUSINESS_ADDRESS` and a one-click unsubscribe link (`/unsubscribe/[token]`).
 - Consent is a separate, unchecked box at signup (the exact wording and timestamp are stored) and a toggle on the student dashboard.
 
+### Going live
+
+See `docs/GO_LIVE_CHECKLIST.md` (and `docs/STRIPE_RADAR.md`). The app only uses Stripe test mode until live keys **and** `STRIPE_ALLOW_LIVE=true` are set. In production it also requires `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, an explicit `ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH` and Turnstile keys.
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:
