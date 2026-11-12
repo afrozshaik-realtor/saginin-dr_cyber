@@ -481,3 +481,17 @@ model StudentCrm {
   @@index([stage])
   @@map("student_crm")
 }
+
+/// TOTP (authenticator app) second factor for admin accounts, keyed by admin email (works for the env-var admin too).
+model AdminMfa {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  secretEnc      String   @map("secret_enc") @db.Text // AES-256-GCM encrypted base32 secret
+  enabled        Boolean  @default(false)
+  lastUsedStep   BigInt   @default(0) @map("last_used_step") // blocks replay of a code within its window
+  recoveryHashes String   @default("[]") @map("recovery_hashes") @db.Text // JSON array of sha256 hashes, each single-use
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_mfa")
+}

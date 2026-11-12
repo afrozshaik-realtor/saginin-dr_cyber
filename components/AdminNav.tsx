@@ -17,6 +17,7 @@ export function AdminNav() {
           <Link href="/admin/access">Access</Link>
           <Link href="/admin/submissions">Submissions</Link>
           <Link href="/admin/settings">Settings</Link>
+          <Link href="/admin/security">Security</Link>
         </div>
       </div>
     </nav>

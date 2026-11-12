@@ -18,7 +18,7 @@ Legend: **YOU** = needs your accounts or a decision. **APP** = already in the co
 - [ ] **[BLOCKER] Leave `ALLOW_ADMIN_REGISTER=false`.** If it were open, anyone could create the first admin account.
 - [ ] **[BLOCKER] Terms, Privacy and Refund pages exist as UNREVIEWED DRAFTS** at `/terms`, `/privacy`, `/refunds`. Fill in the business details, decide the refund window, get a lawyer to review, then clear the draft banner (section 9).
 - [ ] **[BLOCKER] The 12 course titles are placeholders** ("Mini-Course 01 (rename me)") and have no videos (section 3).
-- [ ] **The admin area has no MFA** (section 11). Decide how you will protect it before launch.
+- [ ] **Turn on admin two-step verification** (section 11): log in, open `/admin/security`, enroll your authenticator app, save the recovery codes, then set `ADMIN_REQUIRE_MFA=true`.
 
 ## 2. Infrastructure (Hostinger)
 - [ ] **YOU** Confirm the Node.js app type in hPanel runs `app.drcyber.ca` (you confirmed the plan has it; verify the app actually starts).
@@ -108,7 +108,9 @@ Do all of this in the Stripe Dashboard with **test mode OFF**. Never paste live 
       Do not go live until this is answered.
 
 ## 11. Security hardening
-- [ ] **MFA.** The `/admin` login is a password only (rate-limited, but no MFA). Options: put `/admin` behind **Cloudflare Access** (one-time PIN or SSO), or make the admin password long and unique and accept the risk. Tell me if you want TOTP added in the app.
+- [ ] **Admin MFA (built in).** `/admin/security` enrolls an authenticator app (Google Authenticator, 1Password, Authy; standard TOTP) and gives 8 one-time recovery codes.
+      Enroll **before** setting `ADMIN_REQUIRE_MFA=true` (after that, an admin without MFA can only reach `/admin/security`). Store the recovery codes offline: if you lose both your phone and the codes you must clear the `admin_mfa` row in the database.
+      It works for the env-var admin and for registered admins. Cloudflare Access in front of `/admin` is still a good extra layer.
 - [ ] Turn on MFA for: Stripe, Cloudflare, Hostinger, GitHub, your email account, and the domain registrar.
 - [ ] Rotate everything that was ever used in testing; use **new** values in production, never copied from dev:
       Stripe keys, webhook secret, R2 token, Turnstile keys, session secrets, email API key, database password.

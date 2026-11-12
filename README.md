@@ -111,6 +111,10 @@ R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** A
 
 See `docs/GO_LIVE_CHECKLIST.md` (and `docs/STRIPE_RADAR.md`). The app only uses Stripe test mode until live keys **and** `STRIPE_ALLOW_LIVE=true` are set. In production it also requires `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, an explicit `ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH` and Turnstile keys.
 
+### Admin two-step verification
+
+`/admin/security` enrolls an authenticator app (standard TOTP, no extra dependency) with one-time recovery codes. The secret is encrypted at rest, a code can be used only once, and attempts are rate-limited. `ADMIN_REQUIRE_MFA=true` makes it mandatory. The admin cookie is signed and records which admin it belongs to; API routes only accept fully authenticated sessions.
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

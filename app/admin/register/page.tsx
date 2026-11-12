@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { adminRegistrationAllowed, hashAdminPassword, setAdminSession } from "@/lib/auth";
+import { adminRegistrationAllowed, hashAdminPassword, startAdminSession } from "@/lib/auth";
 import { countAdminUsers, createAdminUser } from "@/lib/store";
 import { adminRegisterSchema } from "@/lib/validation";
 
@@ -27,8 +27,8 @@ async function register(formData: FormData) {
     redirect("/admin/register?error=exists");
   }
 
-  setAdminSession();
-  redirect("/admin");
+  const next = await startAdminSession(parsed.data.email);
+  redirect(next === "setup" ? "/admin/security" : "/admin");
 }
 
 const errorMessages: Record<string, string> = {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { adminRegistrationAllowed, setAdminSession, verifyAdmin } from "@/lib/auth";
+import { adminRegistrationAllowed, startAdminSession, verifyAdmin } from "@/lib/auth";
 import { allowRequest, clientIp } from "@/lib/services/rateLimitDb";
 import { countAdminUsers } from "@/lib/store";
 
@@ -15,8 +15,8 @@ async function login(formData: FormData) {
     redirect("/admin/login?error=rate");
   }
   if (await verifyAdmin(email, password)) {
-    setAdminSession();
-    redirect("/admin");
+    const next = await startAdminSession(email);
+    redirect(next === "mfa" ? "/admin/login/mfa" : next === "setup" ? "/admin/security" : "/admin");
   }
   redirect("/admin/login?error=1");
 }
