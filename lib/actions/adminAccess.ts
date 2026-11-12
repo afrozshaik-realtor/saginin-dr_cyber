@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { planEntitlements } from "@/lib/entitlementPlan";
 import { prisma } from "@/lib/prisma";
+import { logEvent } from "@/lib/services/crm";
 import { z } from "zod";
 
 const idPattern = /^[a-z0-9]{10,40}$/i;
@@ -53,6 +54,7 @@ export async function compGrantAction(formData: FormData) {
       data: { status: "active", source: "comp", note: note ?? null, revokedAt: null, grantedAt: new Date() }
     });
   }
+  await logEvent(prisma, student!.id, "comp_granted", { productSlug, note });
   await audit("comp_grant", { studentId: student!.id, productSlug, created: plan.create.length, reactivated: plan.reactivate.length, note });
   revalidatePath("/admin/access");
   back(email, "granted");

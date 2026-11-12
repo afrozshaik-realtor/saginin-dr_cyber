@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type Stripe from "stripe";
 import { planEntitlements } from "@/lib/entitlementPlan";
+import { onPurchase, onRefundOrDispute } from "@/lib/services/crm";
 
 type Tx = Prisma.TransactionClient;
 
@@ -21,22 +22,22 @@ function coursesForProduct(product: { type: string; courseId: string | null; bun
  * Runs inside the webhook's transaction.
  */
 export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Session) {
-  if (session.payment_status !== "paid") return "not_paid" as const;
+  if (session.payment_status !== "paid") return { result: "not_paid" as const };
 
   const studentId = session.metadata?.studentId;
   const productIds = (session.metadata?.productIds || "").split(",").filter(Boolean);
   if (!studentId || productIds.length === 0) {
     console.error("[stripe] session missing metadata", session.id);
-    return "bad_metadata" as const;
+    return { result: "bad_metadata" as const };
   }
 
   const existingOrder = await tx.order.findUnique({ where: { stripeSessionId: session.id } });
-  if (existingOrder) return "duplicate" as const;
+  if (existingOrder) return { result: "duplicate" as const };
 
   const student = await tx.student.findUnique({ where: { id: studentId } });
   if (!student) {
     console.error("[stripe] paid session for unknown student - needs manual refund/grant", session.id);
-    return "no_student" as const;
+    return { result: "no_student" as const };
   }
 
   const products = await tx.product.findMany({
@@ -45,7 +46,7 @@ export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Se
   });
   if (products.length === 0) {
     console.error("[stripe] paid session for unknown products", session.id);
-    return "no_products" as const;
+    return { result: "no_products" as const };
   }
 
   const expectedCents = products.reduce((sum, p) => sum + p.priceCents, 0);
@@ -70,7 +71,7 @@ export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Se
     }
   });
 
-  if (flag) return "already_reversed" as const;
+  if (flag) return { result: "already_reversed" as const };
 
   const desired = products.flatMap(coursesForProduct);
   const existing = await tx.entitlement.findMany({ where: { studentId } });
@@ -87,7 +88,12 @@ export async function fulfillCheckoutSession(tx: Tx, session: Stripe.Checkout.Se
       data: { status: "active", sourceOrderId: order.id, grantedAt: new Date(), revokedAt: null }
     });
   }
-  return "fulfilled" as const;
+  await onPurchase(tx, studentId, {
+    orderId: order.id,
+    includesBundle: products.some((p) => p.type === "bundle"),
+    amountCents: order.amountCents
+  });
+  return { result: "fulfilled" as const, orderId: order.id };
 }
 
 /**
@@ -109,6 +115,7 @@ export async function revokeOrdersForPaymentIntent(tx: Tx, paymentIntent: string
 
   for (const order of orders) {
     await tx.order.update({ where: { id: order.id }, data: { status: newStatus } });
+    await onRefundOrDispute(tx, order.studentId, newStatus, order.id);
     await tx.entitlement.updateMany({
       where: { sourceOrderId: order.id, status: "active" },
       data: { status: "revoked", revokedAt: new Date() }

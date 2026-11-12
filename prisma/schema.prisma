@@ -101,10 +101,13 @@ model Event {
   event        String
   leadId       String?  @map("lead_id")
   sessionId    String?  @map("session_id")
+  /// Set for CRM / student-journey events (signed_up, purchased, lesson_completed, ...). No FK on purpose: the audit trail should outlive the student.
+  studentId    String?  @map("student_id")
   metadataJson Json?    @map("metadata_json")
   createdAt    DateTime @default(now()) @map("created_at")
   lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
+  @@index([studentId, createdAt])
   @@map("events")
 }
 
@@ -141,6 +144,7 @@ model Student {
   watchProgress    WatchProgress[]
   playbackSessions PlaybackSession[]
   pointsLedger     PointsLedger[]
+  crm              StudentCrm?
 
   @@map("students")
 }
@@ -447,4 +451,33 @@ model PaymentFlag {
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@map("payment_flags")
+}
+
+// ---------------------------------------------------------------------------
+// Simple built-in CRM
+// ---------------------------------------------------------------------------
+
+/// One row per student. stage: signed_up | bought_course | bought_bundle | completed_all | booked_1x1 | client
+/// Stages only move FORWARD automatically; an admin can set any stage by hand.
+model StudentCrm {
+  id               String    @id @default(cuid())
+  studentId        String    @unique @map("student_id")
+  stage            String    @default("signed_up")
+  stageUpdatedAt   DateTime  @default(now()) @map("stage_updated_at")
+  source           String?
+  tags             String    @default("") @db.Text // comma-separated
+  notes            String?   @db.Text
+  completedCourses Int       @default(0) @map("completed_courses")
+  /// CASL: express consent to marketing email, with proof of when/how/what the person agreed to.
+  emailConsent     Boolean   @default(false) @map("email_consent")
+  consentAt        DateTime? @map("consent_at")
+  consentSource    String?   @map("consent_source")
+  consentText      String?   @map("consent_text") @db.Text
+  leadId           String?   @map("lead_id") // quiz lead with the same email, if any
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+  @@map("student_crm")
 }

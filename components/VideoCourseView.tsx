@@ -1,6 +1,8 @@
 import { clsx } from "clsx";
 import Link from "next/link";
+import { BookCallCta } from "@/components/BookCallCta";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import type { CtaLevel } from "@/lib/config/crm";
 
 export type VideoLessonRow = {
   id: string;
@@ -18,7 +20,8 @@ export function VideoCourseView({
   lessons,
   activeId,
   watermark,
-  totalPoints
+  totalPoints,
+  ctaLevel
 }: {
   slug: string;
   courseTitle: string;
@@ -26,6 +29,7 @@ export function VideoCourseView({
   activeId: string;
   watermark: string;
   totalPoints: number;
+  ctaLevel: CtaLevel;
 }) {
   const active = lessons.find((l) => l.id === activeId) ?? lessons[0];
   const done = lessons.filter((l) => l.completed).length;
@@ -65,6 +69,7 @@ export function VideoCourseView({
           {mins(active.durationSeconds)} - {active.points} points
         </p>
         <VideoPlayer key={active.id} lessonId={active.id} watermark={watermark} />
+        <div className="mt-6"><BookCallCta level={ctaLevel} /></div>
       </section>
     </div>
   );

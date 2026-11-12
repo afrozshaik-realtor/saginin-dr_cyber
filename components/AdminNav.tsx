@@ -12,6 +12,7 @@ export function AdminNav() {
           <Link href="/admin/leads">Leads</Link>
           <Link href="/admin/courses">Courses</Link>
           <Link href="/admin/students">Students</Link>
+          <Link href="/admin/pipeline">Pipeline</Link>
           <Link href="/admin/orders">Orders</Link>
           <Link href="/admin/access">Access</Link>
           <Link href="/admin/submissions">Submissions</Link>

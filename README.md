@@ -97,6 +97,16 @@ R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** A
 - `/admin/orders` shows orders and failed payments; `/admin/access` looks up a student and grants comp access, revokes or restores it.
 - Stripe-side settings to enable by hand: see `docs/STRIPE_RADAR.md`.
 
+### Simple CRM and the 1x1 funnel
+
+- Stages: Signed up -> Bought a course -> Bought the bundle -> Completed all 12 -> Booked 1x1 -> Client. They move **forward automatically** from events (`signed_up`, `purchased`, `lesson_completed`, `course_completed`, `completed_all`, `booked_1x1`, `clicked_book_1x1`); an admin can set any stage by hand. A refund is logged but never rolls a stage back.
+- Data: `student_crm` (stage, source, tags, notes, consent proof) plus the existing `events` table, now with a `student_id` column. A quiz `Lead` with the same email is linked automatically.
+- Admin: `/admin/pipeline` (board by stage) and `/admin/students/[id]` (orders, progress, points, notes, tags, event timeline).
+- 1x1 call-to-action: soft after the first completed course, strong after the bundle or all courses. The button goes to `/book-1x1`, which logs the click and redirects to `BOOKING_LINK_1X1` (from the environment only).
+- "Booked 1x1" comes from the Calendly webhook (`POST /api/webhooks/calendly`), matched by email. Set `CALENDLY_WEBHOOK_SIGNING_KEY`; in production unsigned requests cannot move a stage.
+- Email goes through the `EmailSender` interface in `lib/services/transactional.ts` (today it delegates to the existing console/Resend sender; add a provider by implementing the interface). Welcome and receipt emails are transactional. The 1x1 invitation is promotional, so it is sent **only to students with recorded consent** (CASL), at most once, with your `BUSINESS_ADDRESS` and a one-click unsubscribe link (`/unsubscribe/[token]`).
+- Consent is a separate, unchecked box at signup (the exact wording and timestamp are stored) and a toggle on the student dashboard.
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

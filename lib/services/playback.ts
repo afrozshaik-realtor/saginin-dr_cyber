@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { onLessonCompleted } from "@/lib/services/crm";
+import { send1x1InviteEmail } from "@/lib/services/transactional";
 import { advanceValidated, percentWatched, reachedPointsThreshold } from "@/lib/progressLogic";
 
 export const LINK_TTL_SECONDS = 3600; // presigned video URLs live for 1 hour
@@ -111,6 +113,16 @@ export async function recordProgress(input: {
     } catch (error) {
       // Unique (student, lesson, reason): already awarded - this is the idempotency guard.
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) throw error;
+    }
+  }
+
+  // Journey tracking: only the FIRST time this lesson is completed counts (completedAt was empty before).
+  if (done && !progress.completedAt) {
+    try {
+      const milestone = await onLessonCompleted(prisma, studentId, { id: lesson.id, courseId: lesson.courseId });
+      if (milestone.completedAll) await send1x1InviteEmail(studentId); // consent-gated inside
+    } catch (error) {
+      console.error("[crm] lesson completion tracking failed", error); // never break playback over CRM bookkeeping
     }
   }
   return { ok: true as const, percent, awardedPoints };

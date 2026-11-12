@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { BookCallCta } from "@/components/BookCallCta";
 import { SiteHeader } from "@/components/SiteHeader";
+import { updateEmailConsentAction } from "@/lib/actions/lms";
+import { getCtaLevel } from "@/lib/services/crm";
 import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
 import { listActiveEntitlementCourseIds } from "@/lib/services/commerce";
@@ -11,6 +14,7 @@ import { requireStudent } from "@/lib/studentAuth";
 export default async function DashboardPage() {
   const student = await requireStudent("/dashboard");
   const totalPoints = await getTotalPoints(student.id);
+  const [ctaLevel, crm] = await Promise.all([getCtaLevel(prisma, student.id), prisma.studentCrm.findUnique({ where: { studentId: student.id } })]);
   const legacyEnrollments = await listEnrollmentsForStudent(student.id);
   const entitledIds = await listActiveEntitlementCourseIds(student.id);
   const enrollments = [
@@ -54,6 +58,8 @@ export default async function DashboardPage() {
         <h1 className="text-3xl font-bold">My Learning</h1>
         <p className="mt-2 text-slate-600">Welcome back, {student.name}. You have {totalPoints} points.</p>
 
+        {ctaLevel !== "none" ? <div className="mt-6"><BookCallCta level={ctaLevel} /></div> : null}
+
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {active.map(({ course, completedLessons, totalLessons, percent, paidLabel }) => (
             <div key={course.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -86,6 +92,13 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : null}
+        <form action={updateEmailConsentAction} className="mt-10 flex items-center gap-3 text-sm text-slate-600">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="emailConsent" defaultChecked={crm?.emailConsent ?? false} />
+            Send me tips, course updates and offers by email
+          </label>
+          <button className="font-semibold text-blueglow" type="submit">Save</button>
+        </form>
       </section>
     </main>
   );

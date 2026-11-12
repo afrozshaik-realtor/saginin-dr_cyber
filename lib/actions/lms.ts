@@ -6,6 +6,10 @@ import { findLesson } from "@/lib/config/courses";
 import { sendAssignmentSubmissionEmails, sendPasswordResetEmail } from "@/lib/services/email";
 import { fillFormPdf } from "@/lib/services/pdfForm";
 import { getCartSlugs, setCartSlugs } from "@/lib/cart";
+import { MARKETING_CONSENT_TEXT } from "@/lib/config/crm";
+import { prisma } from "@/lib/prisma";
+import { onSignedUp, setEmailConsent } from "@/lib/services/crm";
+import { sendWelcomeEmail } from "@/lib/services/transactional";
 import { allowRequest, clientIp } from "@/lib/services/rateLimitDb";
 import { verifyTurnstile } from "@/lib/services/turnstile";
 import { BUNDLE_SLUG } from "@/lib/config/miniCourses";
@@ -87,6 +91,12 @@ export async function signupAction(formData: FormData) {
   const passwordHash = await hashPassword(parsed.data.password);
   const student = await createStudent({ name: parsed.data.name, email: parsed.data.email, passwordHash });
   if (!student) redirect(`/signup?error=exists&redirect=${encodeURIComponent(redirectTo)}`);
+  await onSignedUp(prisma, student!, {
+    consent: formData.get("emailConsent") === "on",
+    consentText: MARKETING_CONSENT_TEXT,
+    source: String(formData.get("source") || "").replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 60) || "organic"
+  });
+  await sendWelcomeEmail(student!);
   setStudentSession(student!.id);
   redirect(redirectTo);
 }
@@ -278,4 +288,16 @@ export async function submitAssignmentAction(formData: FormData) {
   revalidatePath(`/learn/${slug}`);
   revalidatePath("/dashboard");
   redirect(`/learn/${slug}?lesson=${lessonId}`);
+}
+
+export async function updateEmailConsentAction(formData: FormData) {
+  const student = await requireStudent("/dashboard");
+  await setEmailConsent(
+    prisma,
+    student.id,
+    formData.get("emailConsent") === "on",
+    "dashboard",
+    MARKETING_CONSENT_TEXT
+  );
+  revalidatePath("/dashboard");
 }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { alertOnFailureBurst } from "@/lib/services/alerts";
 import { fulfillCheckoutSession, revokeOrdersForPaymentIntent } from "@/lib/services/fulfillment";
 import { getStripeClient } from "@/lib/services/stripe";
+import { sendReceiptEmail } from "@/lib/services/transactional";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   let sawFailure = false;
+  let fulfilledOrderId: string | null = null;
   try {
     // Recording the event and doing the work commit together: if the work fails, the event row rolls
     // back too and Stripe's retry processes it again. If two deliveries race, the loser hits the
@@ -53,8 +55,11 @@ export async function POST(request: NextRequest) {
       switch (event.type) {
         case "checkout.session.completed":
         case "checkout.session.async_payment_succeeded":
-          await fulfillCheckoutSession(tx, event.data.object as Stripe.Checkout.Session);
+        {
+          const outcome = await fulfillCheckoutSession(tx, event.data.object as Stripe.Checkout.Session);
+          if (outcome.result === "fulfilled") fulfilledOrderId = outcome.orderId;
           break;
+        }
         case "charge.refunded": {
           const charge = event.data.object as Stripe.Charge;
           // Only a FULL refund revokes access; partial refunds are left for manual review.
@@ -89,6 +94,8 @@ export async function POST(request: NextRequest) {
       }
     });
     // After the transaction commits: tripwire for bursts of failed payments (card testing).
+    // Receipt / "access ready" email goes out only after the transaction committed (never inside it).
+    if (fulfilledOrderId) await sendReceiptEmail(fulfilledOrderId).catch((e) => console.error("[stripe] receipt email failed", e));
     if (sawFailure) await alertOnFailureBurst().catch((e) => console.error("[stripe] alert failed", e));
   } catch (error) {
     if (isDuplicateEventError(error)) return NextResponse.json({ received: true, duplicate: true });

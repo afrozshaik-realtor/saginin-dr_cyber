@@ -123,3 +123,24 @@ export function verifyPasswordResetToken(token: string): { studentId: string } |
     return null;
   }
 }
+
+/** Unsubscribe links never expire (CASL: the mechanism must keep working). Purpose-bound so it can't be used as a login token. */
+export function createUnsubscribeToken(studentId: string) {
+  const encoded = Buffer.from(JSON.stringify({ s: studentId, purpose: "unsubscribe" })).toString("base64url");
+  return `${encoded}.${signAccessPayload(encoded)}`;
+}
+
+export function verifyUnsubscribeToken(token: string): { studentId: string } | null {
+  const [encoded, signature] = token.split(".");
+  if (!encoded || !signature) return null;
+  const expected = Buffer.from(signAccessPayload(encoded));
+  const provided = Buffer.from(signature);
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString());
+    if (payload.purpose !== "unsubscribe" || typeof payload.s !== "string") return null;
+    return { studentId: payload.s };
+  } catch {
+    return null;
+  }
+}

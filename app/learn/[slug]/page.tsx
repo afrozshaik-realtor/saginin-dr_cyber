@@ -5,6 +5,7 @@ import { PdfFormFiller } from "@/components/PdfFormFiller";
 import { VideoCourseView } from "@/components/VideoCourseView";
 import { prisma } from "@/lib/prisma";
 import { getTotalPoints } from "@/lib/services/playback";
+import { getCtaLevel } from "@/lib/services/crm";
 import { SiteHeader } from "@/components/SiteHeader";
 import { submitAssignmentAction, submitQuizAction, toggleLessonAction } from "@/lib/actions/lms";
 import { findLesson, listLessonsFlat } from "@/lib/config/courses";
@@ -44,6 +45,7 @@ export default async function LearnPage({
   // Mini-courses keep their (protected R2 video) lessons in the `lessons` table.
   const videoLessons = await prisma.courseLesson.findMany({ where: { courseId: course!.id }, orderBy: { sortOrder: "asc" } });
   if (videoLessons.length > 0) {
+    const ctaLevel = await getCtaLevel(prisma, student.id);
     const [watched, totalPoints] = await Promise.all([
       prisma.watchProgress.findMany({ where: { studentId: student.id, courseId: course!.id } }),
       getTotalPoints(student.id)
@@ -70,6 +72,7 @@ export default async function LearnPage({
           activeId={activeId}
           watermark={student.email}
           totalPoints={totalPoints}
+          ctaLevel={ctaLevel}
         />
       </main>
     );
