@@ -1,13 +1,29 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { getStudentById } from "@/lib/store";
 
 const cookieName = "drcyber_student";
 
+const PLACEHOLDER_SECRETS = new Set(["replace-with-a-different-long-random-secret", "replace-with-a-long-random-secret"]);
+let warned = false;
+const ephemeralSecret = randomBytes(32).toString("hex");
+
+/**
+ * Signing secret for student sessions and email links. In production a missing (or placeholder) secret does NOT
+ * fall back to a publicly known default: a random per-process secret is used instead, so nothing can be forged,
+ * but everyone is logged out on every restart - set STUDENT_SESSION_SECRET.
+ */
 function secret() {
-  return process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || "dev-secret-change-me";
+  const configured = process.env.STUDENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET;
+  if (configured && !PLACEHOLDER_SECRETS.has(configured)) return configured;
+  if (process.env.NODE_ENV !== "production") return "dev-secret-change-me";
+  if (!warned) {
+    warned = true;
+    console.error("[auth] STUDENT_SESSION_SECRET is not set: using a temporary secret (sessions reset on restart). Set it in the environment.");
+  }
+  return ephemeralSecret;
 }
 
 function sign(studentId: string) {

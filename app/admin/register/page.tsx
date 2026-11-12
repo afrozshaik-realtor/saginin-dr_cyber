@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { hashAdminPassword, setAdminSession } from "@/lib/auth";
+import { adminRegistrationAllowed, hashAdminPassword, setAdminSession } from "@/lib/auth";
 import { countAdminUsers, createAdminUser } from "@/lib/store";
 import { adminRegisterSchema } from "@/lib/validation";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 async function register(formData: FormData) {
   "use server";
-  if ((await countAdminUsers()) > 0) {
+  if (!adminRegistrationAllowed() || (await countAdminUsers()) > 0) {
     redirect("/admin/login");
   }
 
@@ -37,7 +37,7 @@ const errorMessages: Record<string, string> = {
 };
 
 export default async function AdminRegisterPage({ searchParams }: { searchParams: { error?: string } }) {
-  if ((await countAdminUsers()) > 0) {
+  if (!adminRegistrationAllowed() || (await countAdminUsers()) > 0) {
     redirect("/admin/login");
   }
 

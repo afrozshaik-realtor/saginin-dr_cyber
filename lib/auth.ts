@@ -6,14 +6,30 @@ import { getAdminUserByEmail } from "@/lib/store";
 
 const cookieName = "drcyber_admin";
 
-export async function verifyAdmin(email: string, password: string) {
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@example.com";
-  const adminPassword = process.env.ADMIN_PASSWORD || "ChangeMe123!";
-  const adminHash = process.env.ADMIN_PASSWORD_HASH;
+/**
+ * The env-var admin. Outside production it falls back to the documented dev defaults; in production it exists
+ * only if you set ADMIN_EMAIL and ADMIN_PASSWORD (or ADMIN_PASSWORD_HASH) - the public default login is disabled.
+ */
+function envAdmin() {
+  const production = process.env.NODE_ENV === "production";
+  const email = process.env.ADMIN_EMAIL || (production ? "" : "admin@example.com");
+  const hash = process.env.ADMIN_PASSWORD_HASH || "";
+  const password = process.env.ADMIN_PASSWORD || (production ? "" : "ChangeMe123!");
+  const unsafe = production && (email === "admin@example.com" || password === "ChangeMe123!");
+  if (!email || (!hash && !password) || unsafe) return null;
+  return { email, hash, password };
+}
 
-  if (email === adminEmail) {
-    if (adminHash) return bcrypt.compare(password, adminHash);
-    return password === adminPassword;
+/** First-run /admin/register is closed in production unless ALLOW_ADMIN_REGISTER=true (otherwise anyone could claim it). */
+export function adminRegistrationAllowed() {
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_ADMIN_REGISTER === "true";
+}
+
+export async function verifyAdmin(email: string, password: string) {
+  const env = envAdmin();
+  if (env && email === env.email) {
+    if (env.hash) return bcrypt.compare(password, env.hash);
+    return password === env.password;
   }
 
   const adminUser = await getAdminUserByEmail(email);

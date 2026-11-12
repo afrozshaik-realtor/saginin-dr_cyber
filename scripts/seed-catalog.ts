@@ -8,6 +8,7 @@
  * - Never overwrites a course title you have edited in /admin/courses.
  * - Unpublishes the legacy pathway courses (nothing is deleted).
  */
+import { createHash } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import {
@@ -23,9 +24,16 @@ const prisma = new PrismaClient();
 async function main() {
   const key = process.env.STRIPE_SECRET_KEY || "";
   if (/^(sk|rk)_live_/.test(key)) {
-    throw new Error("Refusing to run with a LIVE Stripe key. Use a test key (sk_test_...).");
+    // Go-live only: needs BOTH the env flag and the command-line flag, so it can never happen by accident.
+    if (process.env.STRIPE_ALLOW_LIVE !== "true" || !process.argv.includes("--confirm-live")) {
+      throw new Error(
+        "Refusing to run with a LIVE Stripe key. For go-live, set STRIPE_ALLOW_LIVE=true and pass --confirm-live (see docs/GO_LIVE_CHECKLIST.md)."
+      );
+    }
+    console.warn("*** LIVE MODE: creating live Stripe products and prices ***");
   }
   const stripe = key ? new Stripe(key) : null;
+  const keyTag = createHash("sha256").update(key).digest("hex").slice(0, 10); // keeps idempotency keys distinct per account/mode without exposing the key
   if (!stripe) console.warn("STRIPE_SECRET_KEY not set - seeding the database only, no Stripe products.");
 
   // 1) Courses
@@ -91,14 +99,23 @@ async function main() {
   if (stripe) {
     const products = await prisma.product.findMany();
     for (const product of products) {
-      if (product.stripePriceId) continue;
+      if (product.stripePriceId) {
+        // A stored id from the OTHER mode (e.g. test ids left over when you go live) does not exist here: recreate it.
+        try {
+          await stripe.prices.retrieve(product.stripePriceId);
+          continue;
+        } catch (error) {
+          if ((error as { code?: string }).code !== "resource_missing") throw error;
+          console.warn(`Stripe price for ${product.slug} not found in this mode - recreating.`);
+        }
+      }
       const sp = await stripe.products.create(
         { name: product.title, metadata: { productSlug: product.slug, productId: product.id } },
-        { idempotencyKey: `seed-product-${product.id}` }
+        { idempotencyKey: `seed-product-${product.id}-${keyTag}` }
       );
       const price = await stripe.prices.create(
         { product: sp.id, unit_amount: product.priceCents, currency: product.currency },
-        { idempotencyKey: `seed-price-${product.id}-${product.priceCents}` }
+        { idempotencyKey: `seed-price-${product.id}-${product.priceCents}-${keyTag}` }
       );
       await prisma.product.update({
         where: { id: product.id },
