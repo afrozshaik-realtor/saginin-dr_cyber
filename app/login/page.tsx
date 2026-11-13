@@ -31,6 +31,8 @@ export default function LoginPage({
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
             That link has expired. Log in below, or use &quot;Forgot password?&quot; if needed.
           </p>
+        ) : searchParams.error === "rate" ? (
+          <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Too many attempts. Please wait 10 minutes and try again.</p>
         ) : searchParams.error ? (
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">Invalid email or password.</p>
         ) : null}
@@ -38,7 +40,10 @@ export default function LoginPage({
           Log in
         </button>
         <p className="mt-4 text-center text-sm text-slate-600">
-          Student accounts are set up by an admin - check your email for an invite link.
+          New here?{" "}
+          <Link className="font-semibold text-blueglow" href={`/signup?redirect=${encodeURIComponent(redirectTo)}`}>
+            Create an account
+          </Link>
         </p>
       </form>
     </main>

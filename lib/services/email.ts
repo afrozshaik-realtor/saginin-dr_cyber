@@ -12,7 +12,7 @@ type EmailPayload = {
   text: string;
 };
 
-async function sendProviderEmail(payload: EmailPayload) {
+export async function sendProviderEmail(payload: EmailPayload) {
   const provider = process.env.EMAIL_PROVIDER || "console";
   if (provider === "resend" && process.env.RESEND_API_KEY) {
     const response = await fetch("https://api.resend.com/emails", {
@@ -90,6 +90,12 @@ export async function notifyAdmin(lead: FunnelLead) {
     html: text.replaceAll("\n", "<br />")
   });
   await logEmail(lead.id, "admin-notification", subject, status);
+}
+
+export async function sendAdminAlertEmail(subject: string, text: string) {
+  const settings = appSettings();
+  if (!settings.adminNotificationEmail) return "no-recipient";
+  return sendProviderEmail({ to: settings.adminNotificationEmail, subject, text, html: text.replaceAll("\n", "<br />") });
 }
 
 export async function enqueueNurtureSequence(lead: FunnelLead) {

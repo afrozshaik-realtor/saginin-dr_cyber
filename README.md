@@ -61,6 +61,60 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - Course prices live in `lib/config/courses.ts` (`priceCentsByLevel`) for the seeded catalog; change a course's price any time from `/admin/courses/[id]`.
 - **Free courses**: check "This course is free" when creating/editing a course in `/admin/courses` (locks the price to 0). Enrolling in a $0 course skips Stripe entirely and enrolls the student directly (marked `free`) - Stripe Checkout doesn't support $0 line items, so this isn't just a UI nicety, it avoids a real checkout failure.
 
+### Course sales: cart, Checkout, webhook, entitlements (mini-courses)
+
+- Catalog: 12 mini-courses ($1) + an all-courses bundle ($9) as rows in `products` / `bundle_items`. Seed with `STRIPE_SECRET_KEY=sk_test_... npm run seed:catalog` (also creates Stripe test Products/Prices; refuses live keys). Course titles are placeholders - rename them in `/admin/courses`.
+- `/cart` holds product slugs in a cookie; prices are always read from the DB. One Checkout Session covers the whole cart. The bundle is recommended when the cart holds every course or costs more than the bundle.
+- Access is granted ONLY by `POST /api/stripe/webhook` (signature-verified on the raw body, idempotent via `stripe_events`): `checkout.session.completed`, `checkout.session.async_payment_succeeded` create the order + `entitlements`; a full `charge.refunded` or `charge.dispute.created` revokes them. `/api/webhooks/stripe` is kept as an alias.
+- `/checkout/success` only polls `/api/checkout/status` (read-only).
+- Run `npm test` (set `DATABASE_URL` to a scratch MySQL to include the webhook integration tests).
+
+Local webhook testing:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+### Protected video (Cloudflare R2), progress and points
+
+- Videos live in a **private** R2 bucket and are never public. `POST /api/lessons/[id]/play` checks the session and an active entitlement, then returns a presigned GET URL valid for 1 hour (403 otherwise, including for unknown ids). The browser streams straight from R2 (Range/seeking works), so video never passes through the Node app.
+- Admin: `/admin/courses/[id]/videos` uploads a video directly to R2 with a presigned PUT, then attaches it to a lesson (`lessons` table, key under `videos/<courseId>/`).
+- The player (`components/VideoPlayer.tsx`) shows a faint moving watermark with the student's email and refreshes an expired link automatically.
+- Progress: the client sends its playhead position every 15s. The server only lets validated progress advance at real-time speed (max 2x), so seeking to the end can't fake it. At 90% validated, points are written once to `points_ledger` (unique per student + lesson).
+- Limits: max 2 concurrent playback sessions per student, max 10 new links per minute.
+
+R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** API token (Object Read & Write, this bucket only). Video has its **own** variables, `R2_VIDEO_ACCOUNT_ID`, `R2_VIDEO_ACCESS_KEY_ID`, `R2_VIDEO_SECRET_ACCESS_KEY`, `R2_VIDEO_BUCKET_NAME`, so it can live in a different bucket with a different token from assignments and lesson resources (`R2_*`, unchanged). Set all four or none (none = video falls back to `R2_*`). Add a CORS rule on the video bucket so the admin upload works:
+
+```json
+[{ "AllowedOrigins": ["https://app.drcyber.ca", "http://localhost:3000"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+```
+
+### Fraud controls ($1 products)
+
+- Turnstile on signup and checkout (`TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`; fails closed in production if the secret is missing).
+- DB-backed rate limits (`lib/services/rateLimitDb.ts`): signup 5/hour per IP, login 30/10min per IP and 10/10min per email, checkout 5/10min per user and 10/10min per IP.
+- `payment_intent.payment_failed` is recorded; 3 failures in an hour pause that student's checkout, and 5 failures in 10 minutes email `ADMIN_NOTIFICATION_EMAIL`.
+- `/admin/orders` shows orders and failed payments; `/admin/access` looks up a student and grants comp access, revokes or restores it.
+- Stripe-side settings to enable by hand: see `docs/STRIPE_RADAR.md`.
+
+### Simple CRM and the 1x1 funnel
+
+- Stages: Signed up -> Bought a course -> Bought the bundle -> Completed all 12 -> Booked 1x1 -> Client. They move **forward automatically** from events (`signed_up`, `purchased`, `lesson_completed`, `course_completed`, `completed_all`, `booked_1x1`, `clicked_book_1x1`); an admin can set any stage by hand. A refund is logged but never rolls a stage back.
+- Data: `student_crm` (stage, source, tags, notes, consent proof) plus the existing `events` table, now with a `student_id` column. A quiz `Lead` with the same email is linked automatically.
+- Admin: `/admin/pipeline` (board by stage) and `/admin/students/[id]` (orders, progress, points, notes, tags, event timeline).
+- 1x1 call-to-action: soft after the first completed course, strong after the bundle or all courses. The button goes to `/book-1x1`, which logs the click and redirects to `BOOKING_LINK_1X1` (from the environment only).
+- "Booked 1x1" comes from the Calendly webhook (`POST /api/webhooks/calendly`), matched by email. Set `CALENDLY_WEBHOOK_SIGNING_KEY`; in production unsigned requests cannot move a stage.
+- Email goes through the `EmailSender` interface in `lib/services/transactional.ts` (today it delegates to the existing console/Resend sender; add a provider by implementing the interface). Welcome and receipt emails are transactional. The 1x1 invitation is promotional, so it is sent **only to students with recorded consent** (CASL), at most once, with your `BUSINESS_ADDRESS` and a one-click unsubscribe link (`/unsubscribe/[token]`).
+- Consent is a separate, unchecked box at signup (the exact wording and timestamp are stored) and a toggle on the student dashboard.
+
+### Going live
+
+See `docs/GO_LIVE_CHECKLIST.md` (and `docs/STRIPE_RADAR.md`). The app only uses Stripe test mode until live keys **and** `STRIPE_ALLOW_LIVE=true` are set. In production it also requires `ADMIN_SESSION_SECRET`, `STUDENT_SESSION_SECRET`, an explicit `ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH` and Turnstile keys.
+
+### Admin two-step verification
+
+`/admin/security` enrolls an authenticator app (standard TOTP, no extra dependency) with one-time recovery codes. The secret is encrypted at rest, a code can be used only once, and attempts are rate-limited. `ADMIN_REQUIRE_MFA=true` makes it mandatory. The admin cookie is signed and records which admin it belongs to; API routes only accept fully authenticated sessions.
+
 ### Admin-granted access (no payment)
 
 `/admin/students` has a "Grant course access" form: enter an email, optionally a name, and pick a course. On submit it:

@@ -1,21 +1,39 @@
 import Link from "next/link";
+import { BookCallCta } from "@/components/BookCallCta";
 import { SiteHeader } from "@/components/SiteHeader";
+import { updateEmailConsentAction } from "@/lib/actions/lms";
+import { getCtaLevel } from "@/lib/services/crm";
 import { getLessonCount } from "@/lib/config/courses";
 import { formatPrice } from "@/lib/format";
+import { listActiveEntitlementCourseIds } from "@/lib/services/commerce";
 import { getCourseById, getLessonProgressMap, listEnrollmentsForStudent } from "@/lib/store";
+import { prisma } from "@/lib/prisma";
+import { getTotalPoints } from "@/lib/services/playback";
 import { requireStudent } from "@/lib/studentAuth";
 
 export default async function DashboardPage() {
   const student = await requireStudent("/dashboard");
-  const enrollments = await listEnrollmentsForStudent(student.id);
+  const totalPoints = await getTotalPoints(student.id);
+  const [ctaLevel, crm] = await Promise.all([getCtaLevel(prisma, student.id), prisma.studentCrm.findUnique({ where: { studentId: student.id } })]);
+  const legacyEnrollments = await listEnrollmentsForStudent(student.id);
+  const entitledIds = await listActiveEntitlementCourseIds(student.id);
+  const enrollments = [
+    ...legacyEnrollments,
+    ...entitledIds
+      .filter((courseId) => !legacyEnrollments.some((e) => e.courseId === courseId))
+      .map((courseId) => ({ courseId, paymentStatus: "paid" as const, amountPaidCents: undefined, currency: undefined }))
+  ];
 
   const enrolledCourses = await Promise.all(
     enrollments.map(async (enrollment) => {
       const course = await getCourseById(enrollment.courseId);
       if (!course) return null;
-      const progressMap = await getLessonProgressMap(student.id, course.id);
-      const totalLessons = getLessonCount(course);
-      const completedLessons = Object.values(progressMap).filter(Boolean).length;
+      const videoLessonCount = await prisma.courseLesson.count({ where: { courseId: course.id } });
+      const totalLessons = videoLessonCount > 0 ? videoLessonCount : getLessonCount(course);
+      const completedLessons =
+        videoLessonCount > 0
+          ? await prisma.watchProgress.count({ where: { studentId: student.id, courseId: course.id, completedAt: { not: null } } })
+          : Object.values(await getLessonProgressMap(student.id, course.id)).filter(Boolean).length;
       const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
       const paidLabel =
         enrollment.paymentStatus === "paid" && enrollment.amountPaidCents
@@ -38,7 +56,9 @@ export default async function DashboardPage() {
       <SiteHeader student={student} />
       <section className="mx-auto max-w-6xl px-6 py-10 lg:px-8">
         <h1 className="text-3xl font-bold">My Learning</h1>
-        <p className="mt-2 text-slate-600">Welcome back, {student.name}.</p>
+        <p className="mt-2 text-slate-600">Welcome back, {student.name}. You have {totalPoints} points.</p>
+
+        {ctaLevel !== "none" ? <div className="mt-6"><BookCallCta level={ctaLevel} /></div> : null}
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {active.map(({ course, completedLessons, totalLessons, percent, paidLabel }) => (
@@ -72,6 +92,13 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : null}
+        <form action={updateEmailConsentAction} className="mt-10 flex items-center gap-3 text-sm text-slate-600">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="emailConsent" defaultChecked={crm?.emailConsent ?? false} />
+            Send me tips, course updates and offers by email
+          </label>
+          <button className="font-semibold text-blueglow" type="submit">Save</button>
+        </form>
       </section>
     </main>
   );

@@ -12,6 +12,7 @@ export function SiteHeader({ student }: { student: Student | null }) {
         </Link>
         <nav className="flex items-center gap-5 text-sm font-semibold text-slate-600">
           <Link href="/courses">Courses</Link>
+          <Link href="/cart">Cart</Link>
           {student ? (
             <>
               <Link href="/dashboard">My Learning</Link>

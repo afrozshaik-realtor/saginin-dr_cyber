@@ -41,9 +41,14 @@ export default async function AdminCourseDetailPage({
       <section className="mx-auto max-w-4xl px-6 py-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">{course!.title}</h1>
-          <Link className="text-sm font-semibold text-blueglow" href="/admin/courses">
-            Back to courses
-          </Link>
+          <span className="flex gap-4">
+            <Link className="text-sm font-semibold text-blueglow" href={`/admin/courses/${course!.id}/videos`}>
+              Manage videos
+            </Link>
+            <Link className="text-sm font-semibold text-blueglow" href="/admin/courses">
+              Back to courses
+            </Link>
+          </span>
         </div>
 
         {searchParams.saved ? (

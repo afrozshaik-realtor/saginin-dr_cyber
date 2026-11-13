@@ -102,7 +102,7 @@ export default async function AdminStudentsPage({
             <tbody className="divide-y divide-slate-100">
               {students.map((student) => (
                 <tr key={student.id} className="hover:bg-cloud">
-                  <td className="p-3 font-semibold">{student.name}</td>
+                  <td className="p-3 font-semibold"><a className="text-blueglow" href={`/admin/students/${student.id}`}>{student.name}</a></td>
                   <td className="p-3">{student.email}</td>
                   <td className="p-3">
                     <div className="flex flex-col gap-1">

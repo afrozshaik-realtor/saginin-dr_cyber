@@ -101,10 +101,13 @@ model Event {
   event        String
   leadId       String?  @map("lead_id")
   sessionId    String?  @map("session_id")
+  /// Set for CRM / student-journey events (signed_up, purchased, lesson_completed, ...). No FK on purpose: the audit trail should outlive the student.
+  studentId    String?  @map("student_id")
   metadataJson Json?    @map("metadata_json")
   createdAt    DateTime @default(now()) @map("created_at")
   lead         Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
+  @@index([studentId, createdAt])
   @@map("events")
 }
 
@@ -129,13 +132,19 @@ model AutomationSetting {
 }
 
 model Student {
-  id             String           @id @default(cuid())
-  name           String
-  email          String           @unique
-  passwordHash   String           @map("password_hash")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  enrollments    Enrollment[]
-  lessonProgress LessonProgress[]
+  id               String            @id @default(cuid())
+  name             String
+  email            String            @unique
+  passwordHash     String            @map("password_hash")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  enrollments      Enrollment[]
+  lessonProgress   LessonProgress[]
+  orders           Order[]
+  entitlements     Entitlement[]
+  watchProgress    WatchProgress[]
+  playbackSessions PlaybackSession[]
+  pointsLedger     PointsLedger[]
+  crm              StudentCrm?
 
   @@map("students")
 }
@@ -174,22 +183,27 @@ model LessonProgress {
 /// Course content is managed from /admin/courses, not migrated by hand - a normalized relational
 /// schema can replace this later if the catalog grows large enough to need querying into lessons.
 model Course {
-  id            String   @id @default(cuid())
-  slug          String   @unique
-  pathwayId     String?  @map("pathway_id")
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  pathwayId     String?        @map("pathway_id")
   title         String
   category      String
   level         String
-  summary       String   @db.Text
-  description   String   @db.Text
+  summary       String         @db.Text
+  description   String         @db.Text
   certification String?
   image         String
-  priceCents    Int      @map("price_cents")
+  priceCents    Int            @map("price_cents")
   currency      String
-  published     Boolean  @default(true)
-  modulesJson   Json     @map("modules_json")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  published     Boolean        @default(true)
+  sortOrder     Int            @default(0) @map("sort_order")
+  modulesJson   Json           @map("modules_json")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  lessons       CourseLesson[]
+  products      Product[]
+  bundleItems   BundleItem[]
+  entitlements  Entitlement[]
 
   @@map("courses")
 }
@@ -226,4 +240,258 @@ model AssignmentSubmission {
 
   @@unique([studentId, lessonId])
   @@map("assignment_submissions")
+}
+
+// ---------------------------------------------------------------------------
+// Course sales (Stripe) + entitlements
+// ---------------------------------------------------------------------------
+
+/// Video lessons for the paid mini-courses. `r2Key` is the object key in the PRIVATE R2 bucket
+/// (never a URL). Legacy pathway courses keep their lessons in courses.modules_json instead.
+model CourseLesson {
+  id               String            @id @default(cuid())
+  courseId         String            @map("course_id")
+  sortOrder        Int               @default(0) @map("sort_order")
+  title            String
+  r2Key            String?           @map("r2_key")
+  durationSeconds  Int               @default(0) @map("duration_seconds")
+  points           Int               @default(10)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  course           Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  watchProgress    WatchProgress[]
+  playbackSessions PlaybackSession[]
+
+  @@index([courseId, sortOrder])
+  @@map("lessons")
+}
+
+/// Something sellable. type "course" -> courseId is set. type "bundle" -> the courses are listed in bundle_items.
+/// Prices are ALWAYS read from this table on the server, never from the client.
+model Product {
+  id              String       @id @default(cuid())
+  type            String // "course" | "bundle"
+  slug            String       @unique
+  title           String
+  courseId        String?      @unique @map("course_id")
+  priceCents      Int          @map("price_cents")
+  currency        String       @default("usd")
+  stripeProductId String?      @map("stripe_product_id")
+  stripePriceId   String?      @map("stripe_price_id")
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  course          Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  bundleItems     BundleItem[]
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model BundleItem {
+  productId String  @map("product_id")
+  courseId  String  @map("course_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@id([productId, courseId])
+  @@map("bundle_items")
+}
+
+/// Created ONLY by the verified Stripe webhook. status: paid | refunded | disputed
+model Order {
+  id                    String        @id @default(cuid())
+  studentId             String        @map("student_id")
+  stripeSessionId       String        @unique @map("stripe_session_id")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  amountCents           Int           @map("amount_cents")
+  currency              String
+  status                String        @default("paid")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  student               Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  items                 OrderItem[]
+  entitlements          Entitlement[]
+
+  @@index([stripePaymentIntentId])
+  @@index([studentId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String  @id @default(cuid())
+  orderId         String  @map("order_id")
+  productId       String  @map("product_id")
+  unitAmountCents Int     @map("unit_amount_cents")
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+/// The single source of truth for "can this student open this paid course". status: active | revoked
+model Entitlement {
+  id            String    @id @default(cuid())
+  studentId     String    @map("student_id")
+  courseId      String    @map("course_id")
+  sourceOrderId String?   @map("source_order_id")
+  status        String    @default("active")
+  source        String    @default("purchase") // purchase | comp (admin-granted)
+  note          String?
+  grantedAt     DateTime  @default(now()) @map("granted_at")
+  revokedAt     DateTime? @map("revoked_at")
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceOrder   Order?    @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, courseId])
+  @@index([sourceOrderId])
+  @@map("entitlements")
+}
+
+/// Webhook idempotency: one row per processed Stripe event id.
+model StripeEvent {
+  eventId     String   @id @map("event_id")
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("stripe_events")
+}
+
+// ---------------------------------------------------------------------------
+// Protected video playback, progress, points
+// ---------------------------------------------------------------------------
+
+/// One row per presigned-link issue. Used for the concurrent-session cap, link rate limiting,
+/// and as the time baseline the server uses to validate watch progress.
+model PlaybackSession {
+  id         String       @id @default(cuid())
+  studentId  String       @map("student_id")
+  lessonId   String       @map("lesson_id")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  lastSeenAt DateTime     @default(now()) @map("last_seen_at")
+  expiresAt  DateTime     @map("expires_at")
+  endedAt    DateTime?    @map("ended_at")
+  student    Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([studentId, endedAt, lastSeenAt])
+  @@map("playback_sessions")
+}
+
+/// Server-validated watch progress. `validatedSeconds` only advances at (at most) real-time speed,
+/// so seeking to the end or spamming requests cannot fake completion.
+model WatchProgress {
+  id               String       @id @default(cuid())
+  studentId        String       @map("student_id")
+  courseId         String       @map("course_id")
+  lessonId         String       @map("lesson_id")
+  validatedSeconds Float        @default(0) @map("validated_seconds")
+  lastPosition     Float        @default(0) @map("last_position")
+  percent          Int          @default(0)
+  completedAt      DateTime?    @map("completed_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  student          Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson           CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@map("watch_progress")
+}
+
+/// Append-only points. The unique key makes an award happen at most once per student per lesson.
+/// (Deliberately no foreign key to the lesson, so points survive a lesson being deleted.)
+model PointsLedger {
+  id        String   @id @default(cuid())
+  studentId String   @map("student_id")
+  lessonId  String   @map("lesson_id")
+  courseId  String   @map("course_id")
+  points    Int
+  reason    String   @default("lesson_watched")
+  createdAt DateTime @default(now()) @map("created_at")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId, reason])
+  @@index([studentId])
+  @@map("points_ledger")
+}
+
+// ---------------------------------------------------------------------------
+// Fraud controls
+// ---------------------------------------------------------------------------
+
+/// Sliding-window rate limiting that survives restarts and works across processes.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
+
+/// One row per failed payment (Stripe payment_intent.payment_failed). Drives burst alerts and
+/// blocks checkout for a student who keeps failing (card testing).
+model PaymentFailure {
+  id              String   @id @default(cuid())
+  eventId         String?  @unique @map("event_id")
+  studentId       String?  @map("student_id")
+  paymentIntentId String?  @map("payment_intent_id")
+  code            String?
+  declineCode     String?  @map("decline_code")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([studentId, createdAt])
+  @@index([createdAt])
+  @@map("payment_failures")
+}
+
+/// A refund/dispute that arrived BEFORE its order existed (webhooks can be out of order).
+/// When the order is created later it is born refunded/disputed and grants nothing.
+model PaymentFlag {
+  paymentIntentId String   @id @map("payment_intent_id")
+  kind            String // refunded | disputed
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("payment_flags")
+}
+
+// ---------------------------------------------------------------------------
+// Simple built-in CRM
+// ---------------------------------------------------------------------------
+
+/// One row per student. stage: signed_up | bought_course | bought_bundle | completed_all | booked_1x1 | client
+/// Stages only move FORWARD automatically; an admin can set any stage by hand.
+model StudentCrm {
+  id               String    @id @default(cuid())
+  studentId        String    @unique @map("student_id")
+  stage            String    @default("signed_up")
+  stageUpdatedAt   DateTime  @default(now()) @map("stage_updated_at")
+  source           String?
+  tags             String    @default("") @db.Text // comma-separated
+  notes            String?   @db.Text
+  completedCourses Int       @default(0) @map("completed_courses")
+  /// CASL: express consent to marketing email, with proof of when/how/what the person agreed to.
+  emailConsent     Boolean   @default(false) @map("email_consent")
+  consentAt        DateTime? @map("consent_at")
+  consentSource    String?   @map("consent_source")
+  consentText      String?   @map("consent_text") @db.Text
+  leadId           String?   @map("lead_id") // quiz lead with the same email, if any
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([stage])
+  @@map("student_crm")
+}
+
+/// TOTP (authenticator app) second factor for admin accounts, keyed by admin email (works for the env-var admin too).
+model AdminMfa {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  secretEnc      String   @map("secret_enc") @db.Text // AES-256-GCM encrypted base32 secret
+  enabled        Boolean  @default(false)
+  lastUsedStep   BigInt   @default(0) @map("last_used_step") // blocks replay of a code within its window
+  recoveryHashes String   @default("[]") @map("recovery_hashes") @db.Text // JSON array of sha256 hashes, each single-use
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_mfa")
 }
