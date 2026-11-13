@@ -83,7 +83,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 - Progress: the client sends its playhead position every 15s. The server only lets validated progress advance at real-time speed (max 2x), so seeking to the end can't fake it. At 90% validated, points are written once to `points_ledger` (unique per student + lesson).
 - Limits: max 2 concurrent playback sessions per student, max 10 new links per minute.
 
-R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** API token (Object Read & Write, this bucket only), set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, and add a CORS rule on the bucket so the admin upload works:
+R2 setup (use a separate dev bucket until go-live): create a **bucket-scoped** API token (Object Read & Write, this bucket only). Video has its **own** variables, `R2_VIDEO_ACCOUNT_ID`, `R2_VIDEO_ACCESS_KEY_ID`, `R2_VIDEO_SECRET_ACCESS_KEY`, `R2_VIDEO_BUCKET_NAME`, so it can live in a different bucket with a different token from assignments and lesson resources (`R2_*`, unchanged). Set all four or none (none = video falls back to `R2_*`). Add a CORS rule on the video bucket on the bucket so the admin upload works:
 
 ```json
 [{ "AllowedOrigins": ["https://app.drcyber.ca", "http://localhost:3000"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]

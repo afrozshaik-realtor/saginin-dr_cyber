@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hasCourseAccess } from "@/lib/services/commerce";
 import { LINK_TTL_SECONDS, openPlaybackSession } from "@/lib/services/playback";
-import { presignObjectUrl } from "@/lib/services/storage";
+import { videoStorage } from "@/lib/services/storage";
 import { getStudentSessionId } from "@/lib/studentAuth";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +31,8 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: opened.reason, message }, { status: 429 });
   }
 
-  const { url, expiresAt } = presignObjectUrl("GET", lesson.r2Key, LINK_TTL_SECONDS, {
-    query: { "response-content-type": "video/mp4" }
+  const { url, expiresAt } = videoStorage.presign("GET", lesson.r2Key, LINK_TTL_SECONDS, {
+    "response-content-type": "video/mp4"
   });
   const progress = await prisma.watchProgress.findUnique({
     where: { studentId_lessonId: { studentId, lessonId: lesson.id } }

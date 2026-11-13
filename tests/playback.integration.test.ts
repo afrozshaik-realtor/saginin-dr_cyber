@@ -98,6 +98,25 @@ describe("protected playback", { skip: !run }, () => {
     assert.ok(Math.abs(new Date(body.expiresAt).getTime() - (Date.now() + 3600_000)) < 5000);
   });
 
+  test("with R2_VIDEO_* set, the play route signs against the video bucket, not the general one", async () => {
+    await prisma.playbackSession.deleteMany({ where: { studentId: owner } });
+    asStudent(owner);
+    process.env.R2_VIDEO_ACCOUNT_ID = "videoacct";
+    process.env.R2_VIDEO_ACCESS_KEY_ID = "VIDEOKEYID";
+    process.env.R2_VIDEO_SECRET_ACCESS_KEY = "video-secret-value";
+    process.env.R2_VIDEO_BUCKET_NAME = "drcyber-videos-prod";
+    try {
+      const body = await (await callPlay(lessons[0].id)).json();
+      const url = new URL(body.url);
+      assert.equal(url.hostname, "videoacct.r2.cloudflarestorage.com");
+      assert.ok(url.pathname.startsWith("/drcyber-videos-prod/videos/"));
+      assert.ok(url.searchParams.get("X-Amz-Credential")?.startsWith("VIDEOKEYID/"));
+    } finally {
+      for (const k of ["R2_VIDEO_ACCOUNT_ID", "R2_VIDEO_ACCESS_KEY_ID", "R2_VIDEO_SECRET_ACCESS_KEY", "R2_VIDEO_BUCKET_NAME"]) delete process.env[k];
+    }
+    await prisma.playbackSession.deleteMany({ where: { studentId: owner } });
+  });
+
   test("seeking to the end does not earn points; honest watching earns them once", async () => {
     await prisma.playbackSession.deleteMany({ where: { studentId: owner } });
     asStudent(owner);

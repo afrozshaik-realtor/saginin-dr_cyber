@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { presignObjectUrl } from "@/lib/services/storage";
+import { videoStorage } from "@/lib/services/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,6 @@ export async function POST(request: NextRequest) {
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
 
   const key = `videos/${course.id}/${crypto.randomUUID()}.${extensions[parsed.data.contentType]}`;
-  const { url } = presignObjectUrl("PUT", key, 15 * 60);
+  const { url } = videoStorage.presign("PUT", key, 15 * 60);
   return NextResponse.json({ key, url, contentType: parsed.data.contentType });
 }

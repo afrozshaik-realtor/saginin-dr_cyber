@@ -72,7 +72,7 @@ Do all of this in the Stripe Dashboard with **test mode OFF**. Never paste live 
 
 ## 6. Cloudflare R2 (production)
 - [ ] **YOU** Create a **new production bucket** (do not reuse the dev one). Keep it **private**: no public access, `r2.dev` URL disabled, no custom domain attached.
-- [ ] **YOU** Create a **bucket-scoped API token** (Object Read & Write on this bucket only, not account-wide, not Admin). Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
+- [ ] **YOU** Create a **bucket-scoped API token** (Object Read & Write on this bucket only, not account-wide, not Admin). Set the video variables `R2_VIDEO_ACCOUNT_ID`, `R2_VIDEO_ACCESS_KEY_ID`, `R2_VIDEO_SECRET_ACCESS_KEY`, `R2_VIDEO_BUCKET_NAME` (all four, or none). Keep the existing `R2_*` variables pointing at the general uploads bucket (assignments, lesson resources); the two buckets and tokens stay separate.
 - [ ] CORS on the bucket: allow **only** `https://app.drcyber.ca`, method `PUT`, header `content-type` (JSON in README). Remove `http://localhost:3000` here.
 - [ ] Revoke/delete the dev token and dev bucket when you no longer need them.
 - [ ] Keep original video files somewhere else too (R2 is not a backup by default).

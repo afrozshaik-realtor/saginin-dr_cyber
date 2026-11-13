@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { objectExists } from "@/lib/services/storage";
+import { videoStorage } from "@/lib/services/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const { courseId, title, r2Key, durationSeconds, points } = parsed.data;
 
   if (!r2Key.startsWith(`videos/${courseId}/`)) return NextResponse.json({ error: "Invalid key" }, { status: 400 });
-  if (!(await objectExists(r2Key))) return NextResponse.json({ error: "Video not found in storage" }, { status: 400 });
+  if (!(await videoStorage.exists(r2Key))) return NextResponse.json({ error: "Video not found in storage" }, { status: 400 });
 
   const last = await prisma.courseLesson.findFirst({ where: { courseId }, orderBy: { sortOrder: "desc" } });
   const lesson = await prisma.courseLesson.create({
